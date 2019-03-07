@@ -1,0 +1,336 @@
+<?php
+
+/**
+ * @file
+ * CKEditor inline image style.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function ckeditor_inline_image_style_menu() {
+  $items = array();
+  $items['admin/config/media/ckeditor_inline_image_style/settings'] = array(
+    'title' => 'Settings',
+    'type' => MENU_LOCAL_TASK,
+    'description' => 'ckeditor_inline_image_style settings (CKEditor, File Entity, ...)',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('ckeditor_inline_image_style_admin_settings'),
+    'access arguments' => array('administer ckeditor_inline_image_styles'),
+    'file' => 'ckeditor_inline_image_style.admin.inc',
+    'weight' => 0,
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function ckeditor_inline_image_style_permission() {
+  return array(
+    'administer ckeditor_inline_image_styles' => array(
+      'title' => t('Administer CKEditor inline image styles'),
+      'description' => t('Administer CKEditor inline image styles'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_page_build().
+ */
+function ckeditor_inline_image_style_page_build(&$page) {
+  // TODO: Only load on node edit.
+  // Integrate with the WYSIWYG module, and the CKEditor module.
+  $image_styles = image_styles();
+  $ckeditor_mappings = variable_get('ckeditor_inline_image_style_ckeditor_mappings', array_keys(image_styles()));
+  $mappings = array();
+
+  // CKEditor library expects an array of options formatted as
+  // ['Display name', 'machine_name'].
+  foreach ($ckeditor_mappings as $machine_name) {
+    if (array_key_exists($machine_name, $image_styles)) {
+      $mappings[] = array($image_styles[$machine_name]['label'], $machine_name);
+    }
+  }
+
+  if (!empty($mappings)) {
+    $mappings[] = array('Not Set', 'not_set');
+    drupal_add_js(array(
+      'ckeditor_inline_image_style' => array(
+        'mappings' => $mappings,
+        'label' => variable_get('ckeditor_inline_image_style_ckeditor_label', 'Image style (required)'),
+        'ckeditorDefaultMapping' => variable_get('ckeditor_inline_image_style_ckeditor_default_mapping', 'not_set'),
+      )), 'setting');
+  }
+}
+
+/**
+ * Implements hook_wysiwyg_plugin().
+ *
+ * Modify the CKEditor image dialog for use with the picture module.
+ */
+function ckeditor_inline_image_style_wysiwyg_plugin($editor, $version) {
+  if ($editor == 'ckeditor') {
+    return array(
+      'ckeditor_inline_image_style_ckeditor' => array(
+        'path' => drupal_get_path('module', 'ckeditor_inline_image_style') . '/ckeditor/plugins/',
+        'load' => TRUE,
+        'extensions' => array('ckeditor_inline_image_style_ckeditor' => t('Select image style in CKEditor')),
+        'url' => 'https://www.drupal.org/project/ckeditor_inline_image_style',
+      ),
+    );
+  }
+}
+
+/**
+ * Implements hook_ckeditor_plugin().
+ *
+ * Modify the CKEditor image dialog for use with the picture module.
+ */
+function ckeditor_inline_image_style_ckeditor_plugin() {
+  return array(
+    'ckeditor_inline_image_style_ckeditor' => array(
+      'name' => 'ckeditor_inline_image_style_ckeditor',
+      'desc' => t('Select image style in CKEditor.'),
+      'buttons' => FALSE,
+      'path' => drupal_get_path('module', 'ckeditor_inline_image_style') . '/ckeditor/plugins/',
+      'default' => 't',
+    ),
+  );
+}
+
+/**
+ * Implements hook_wysiwyg_editor_settings_alter().
+ */
+function ckeditor_inline_image_style_wysiwyg_editor_settings_alter(&$settings, $context) {
+  if ($context['profile']->editor == 'ckeditor') {
+    if (!isset($settings['extraAllowedContent'])) {
+      $settings['extraAllowedContent'] = array(
+        'img[src,title,alt,style,width,height,class,hspace,vspace,view_mode,format,fid,data-picture-mapping,data-picture-group,data-picture-align,data-image-style]',
+      );
+    }
+    else {
+      // @todo: try finding the img entry and add data- attributes if needed.
+    }
+  }
+}
+
+/**
+ * Implements hook_filter_info().
+ */
+function ckeditor_inline_image_style_filter_info() {
+  $filters = array();
+  $filters['ckeditor_inline_image_style'] = array(
+    'title' => t('Make images support image styles'),
+    'description' => t('Replace img tags with markup that contains the selected image style.'),
+    'process callback' => '_ckeditor_inline_image_style_filter_process',
+    'type' => 'FILTER_TYPE_TRANSFORM_REVERSIBLE',
+  );
+
+  return $filters;
+}
+
+/**
+ * Process callback for inline image filter.
+ */
+function _ckeditor_inline_image_style_filter_process($text, $filter) {
+
+  // Find all img tags with a data-image-style attribute.
+  preg_match_all('/<img [^>]*data-image-style\s*=\s*["\'][^>]*>/i', $text, $images);
+  if (!empty($images)) {
+    foreach ($images[0] as $image) {
+      // Create the render array expected by theme_ckeditor_inline_image_style_formatter.
+      $image_render_array = _ckeditor_inline_image_style_filter_prepare_image($image);
+      if (!$image_render_array) {
+        continue;
+      }
+
+      // Get the responsive markup for this image.
+      $new_markup = drupal_render($image_render_array);
+
+      // Replace the original img tag with the responsive markup.
+      $text = str_replace($image, $new_markup, $text);
+    }
+  }
+  return $text;
+}
+
+/**
+ * Prepares an image.
+ */
+function _ckeditor_inline_image_style_filter_prepare_image($image) {
+  // Make sure the closing tag is right.
+  $image = str_replace('/>', '>', $image);
+  $image = str_replace('>', ' />', $image);
+  $image = str_replace("&nbsp;", '', $image);
+  $image = htmlspecialchars($image);
+
+  // Parse the tag as xml.
+  $xml = simplexml_load_string('<image>' . html_entity_decode($image, ENT_QUOTES, "utf-8") . '</image>');
+  if (isset($xml->img[0]) && is_object($xml->img[0])) {
+    $attributes = array();
+    foreach ($xml->img[0]->attributes() as $a => $b) {
+      $attributes[$a] = (string) $b;
+    }
+  }
+
+  $image_style = FALSE;
+  if (isset($attributes['data-image-style'])) {
+    $image_style = $attributes['data-image-style'];
+  }
+
+  if (!$image_style) {
+    return;
+  }
+
+  $image_styles = image_styles();
+  if (!isset($image_styles[$image_style])) {
+    return;
+  }
+
+  // Make sure we have a src attribute.
+  if (!isset($attributes['src'])) {
+    return FALSE;
+  }
+
+  $src = $attributes['src'];
+  unset($attributes['src']);
+
+  $alt = isset($attributes['alt']) ? $attributes['alt'] : '';
+  unset($attributes['alt']);
+
+  $title = isset($attributes['title']) ? $attributes['title'] : '';
+  unset($attributes['title']);
+
+  // Ensure that class attributes are properly split into array.
+  if (!empty($attributes['class']) && !is_array($attributes['class'])) {
+    $attributes['class'] = array_filter(explode(' ', $attributes['class']));
+  }
+
+  // Make sure we have map src to uri.
+  $uri = ckeditor_inline_image_style_image_uri($src);
+  if (!$uri) {
+    return FALSE;
+  }
+
+  $image_info = image_get_info($uri);
+  if (!$image_info) {
+    // It's not an image.
+    return FALSE;
+  }
+
+  $image_render_array = array(
+    '#theme' => 'image_style',
+    '#style_name' => $image_style,
+    '#path' => $uri,
+    '#width' => $image_info['width'],
+    '#height' => $image_info['height'],
+    '#alt' => $alt,
+    '#title' => $title,
+    '#attributes' => array(
+      'data-image-style' => $image_style,
+    ) + $attributes,
+  );
+  return $image_render_array;
+}
+
+/**
+ * Helper function to figure out the uri of an image source.
+ *
+ * @param string $src
+ *   Image src starting with http://, https://, or root relative /.
+ */
+function ckeditor_inline_image_style_image_uri($src) {
+  foreach (module_implements('ckeditor_inline_image_style_image_uri') as $module) {
+    $function = $module . '_ckeditor_inline_image_style_image_uri';
+    if ($uri = $function($src)) {
+      $uri = file_stream_wrapper_uri_normalize($uri);
+      return urldecode($uri);
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Implements hook_ckeditor_inline_image_style_image_uri().
+ */
+function ckeditor_inline_image_style_ckeditor_inline_image_style_image_uri($src) {
+  global $base_path;
+
+  $uri = '';
+  // Prepare the src by removing http:// or https://.
+  $src = parse_url($src, PHP_URL_PATH);
+  // Remove leading or trailing slashes.
+  $src = trim($src, '/');
+
+  // List all visible stream wrappers.
+  $visible_stream_wrappers = array_intersect_key(file_get_stream_wrappers(STREAM_WRAPPERS_WRITE), file_get_stream_wrappers(STREAM_WRAPPERS_VISIBLE));
+  $needles = array();
+  $matches = array();
+  foreach ($visible_stream_wrappers as $scheme => $data) {
+    $class = file_stream_wrapper_get_class($scheme);
+    $stream_wrapper = new $class();
+    // Trim leading or trailing slashes since the Directory could be root
+    // relative.
+    if (method_exists($stream_wrapper, 'getDirectoryPath')) {
+      $needles[$scheme] = trim($base_path . $stream_wrapper->getDirectoryPath(), '/');
+
+      // Check whether the file stream directory is at the beginning of
+      // the image src. Use === since strpos could return false.
+      if (!empty($needles[$scheme]) && strpos($src, $needles[$scheme]) === 0) {
+        $matches[$scheme] = $needles[$scheme];
+      }
+    }
+  }
+
+  // No file stream wrapper is starting with the image src.
+  // So it's not a public file.
+  if (empty($matches)) {
+    // Check for managed/private file with relative path like system/files/..
+    $src_exploded = explode('/', $src);
+    if ($src_exploded[0] == 'system' && $src_exploded[1] == 'files') {
+      // Managed/private file recognized.
+      // Check for image style derivatives.
+      if ($src_exploded[2] == 'styles') {
+        // Image style recognized.
+        $unwanted_part = 'system/files/styles/' . $src_exploded[3] . '/private/';
+        $uri = str_replace($unwanted_part, 'private://', $src);
+        $uri = file_stream_wrapper_uri_normalize($uri);
+        return urldecode($uri);
+      }
+      else {
+        // No image style recognized; must be an original.
+        $unwanted_part = 'system/files/';
+        $uri = str_replace($unwanted_part, 'private://', $src);
+        $uri = file_stream_wrapper_uri_normalize($uri);
+        return urldecode($uri);
+      }
+    }
+    else {
+      // Can't figure out the Drupal uri.
+      return FALSE;
+    }
+  }
+
+  // If one file scheme directory is a subdirectory of another file
+  // scheme directory, choose the longer one. This issue is possible with
+  // the following scenario:
+  // public file dir: /sites/default/files/
+  // private file dir: /sites/default/files/private/
+  // image src: /sites/default/files/private/the-image.jpg
+  // In this example, the intended scheme would be 'private'.
+  if (empty($matches)) {
+    // Can't figure out the Drupal uri.
+    return FALSE;
+  }
+
+  // Find the length of each matching directory path.
+  $lengths = array_map('strlen', $matches);
+
+  // Determine the key of the longest one.
+  $the_scheme = array_search(max($lengths), $lengths);
+
+  // Construct the Drupal uri.
+  $uri = $the_scheme . '://' . str_replace($matches[$the_scheme], '', $src);
+  return $uri;
+}

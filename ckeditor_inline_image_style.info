@@ -1,0 +1,4 @@
+name = CKEditor inline image styles
+description = CKEditor inline image styles
+core = 7.x
+configure = admin/config/media/ckeditor_inline_image_style
