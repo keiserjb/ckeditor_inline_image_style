@@ -5,14 +5,21 @@
 ( function(){
   CKEDITOR.plugins.add('ckeditor_inline_image_style_ckeditor',
   {
+      onLoad: function() {
+        CKEDITOR.addCss(Drupal.settings.ckeditor_inline_image_style.editorCSS);
+      },
+
       init : function(editor)
       {
 
         // Used later to ensure the required features have been enabled in the
         // Advanced Content Filter.
-        features = {
-          'imageSize': { 'requiredContent': 'img[data-image-style]' }
-        };
+        features = {};
+        if (Drupal.settings.ckeditor_inline_image_style.required) {
+          features = {
+            'imageSize': { 'requiredContent': 'img[data-image-style]' }
+          };
+        }
 
         // If we have image2, enable the more advanced functionality
         if (CKEDITOR.config.plugins.indexOf('image2') != -1) {
@@ -139,13 +146,14 @@
                 }
               },
               validate: function() {
-                if (this.getValue() == 'not_set') {
-                  var message = 'Please make a selection from ' + Drupal.settings.ckeditor_inline_image_style.label;
-                  alert(message);
-                  return false;
-                } else {
-                  return true;
+                if (Drupal.settings.ckeditor_inline_image_style.required) {
+                  if (this.getValue() == 'not_set') {
+                    var message = 'Please make a selection from ' + Drupal.settings.ckeditor_inline_image_style.label;
+                    alert(message);
+                    return false;
+                  }
                 }
+                return true;
               }
             },
               // Position before preview.

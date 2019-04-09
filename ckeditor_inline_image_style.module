@@ -54,14 +54,60 @@ function ckeditor_inline_image_style_page_build(&$page) {
   }
 
   if (!empty($mappings)) {
-    $mappings[] = array('Not Set', 'not_set');
+    // Add empty option.
+    array_unshift($mappings, array('Not Set', 'not_set'));
+
+    // Add settings.
     drupal_add_js(array(
       'ckeditor_inline_image_style' => array(
+        'required' => FALSE,
         'mappings' => $mappings,
         'label' => variable_get('ckeditor_inline_image_style_ckeditor_label', 'Image style (required)'),
         'ckeditorDefaultMapping' => variable_get('ckeditor_inline_image_style_ckeditor_default_mapping', 'not_set'),
+        'editorCSS' => ckeditor_inline_image_style_css(),
       )), 'setting');
+
+    // Add CSS for CKEditor.
+    drupal_add_css(ckeditor_inline_image_style_css(), 'inline');
   }
+}
+
+/**
+ * Generate css to handle more realistic display of image styles.
+ */
+function ckeditor_inline_image_style_css() {
+  $image_styles = image_styles();
+  $ckeditor_mappings = variable_get('ckeditor_inline_image_style_ckeditor_mappings', array_keys(image_styles()));
+  $mappings = array();
+
+  // CKEditor library expects an array of options formatted as
+  // ['Display name', 'machine_name'].
+  foreach ($ckeditor_mappings as $machine_name) {
+    if (array_key_exists($machine_name, $image_styles)) {
+      $dimensions = array(
+        'width' => 1000,
+        'height' => 1000,
+      );
+
+      // Transform dimensions.
+      image_style_transform_dimensions($machine_name, $dimensions);
+
+      // Add unit if needed.
+      if (strpos($dimensions['width'], '%') === FALSE) {
+        $dimensions['width'] .= 'px';
+      }
+      if (strpos($dimensions['height'], '%') === FALSE) {
+        $dimensions['height'] .= 'px';
+      }
+
+      $mappings[$machine_name] = 'img[data-image-style="' . $machine_name . '"] {';
+      $mappings[$machine_name] .= ' width: ' . $dimensions['width'] . ';';
+      $mappings[$machine_name] .= ' height: ' . $dimensions['height'] . ';';
+      $mappings[$machine_name] .= '}';
+    }
+  }
+
+  return implode("\n", $mappings);
 }
 
 /**
