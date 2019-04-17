@@ -39,6 +39,11 @@ function ckeditor_inline_image_style_permission() {
  * Implements hook_page_build().
  */
 function ckeditor_inline_image_style_page_build(&$page) {
+  // Bail out soon.
+  if (!isset($page['content']['system_main']['#node_edit_form']) || !$page['content']['system_main']['#node_edit_form']) {
+    return;
+  }
+
   // TODO: Only load on node edit.
   // Integrate with the WYSIWYG module, and the CKEditor module.
   $image_styles = image_styles();
@@ -67,15 +72,15 @@ function ckeditor_inline_image_style_page_build(&$page) {
         'editorCSS' => ckeditor_inline_image_style_css(),
       )), 'setting');
 
-    // Add CSS for CKEditor.
-    drupal_add_css(ckeditor_inline_image_style_css(), 'inline');
+    // Add CSS for CKEditor image preview.
+    drupal_add_css(ckeditor_inline_image_style_css('.ImagePreviewBox'), 'inline');
   }
 }
 
 /**
  * Generate css to handle more realistic display of image styles.
  */
-function ckeditor_inline_image_style_css() {
+function ckeditor_inline_image_style_css($prefix = '') {
   $image_styles = image_styles();
   $ckeditor_mappings = variable_get('ckeditor_inline_image_style_ckeditor_mappings', array_keys(image_styles()));
   $mappings = array();
@@ -100,7 +105,7 @@ function ckeditor_inline_image_style_css() {
         $dimensions['height'] .= 'px';
       }
 
-      $mappings[$machine_name] = 'img[data-image-style="' . $machine_name . '"] {';
+      $mappings[$machine_name] = $prefix . ' img[data-image-style="' . $machine_name . '"] {';
       $mappings[$machine_name] .= ' width: ' . $dimensions['width'] . ';';
       $mappings[$machine_name] .= ' height: ' . $dimensions['height'] . ';';
       $mappings[$machine_name] .= '}';
