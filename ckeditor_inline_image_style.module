@@ -63,11 +63,16 @@ function ckeditor_inline_image_style_page_build(&$page) {
     array_unshift($mappings, array('Not Set', 'not_set'));
 
     // Add settings.
+    $label = variable_get('ckeditor_inline_image_style_ckeditor_label', 'Image style');
+    if (variable_get('ckeditor_inline_image_style_ckeditor_required', FALSE)) {
+      $label .= ' (required)';
+    }
+
     drupal_add_js(array(
       'ckeditor_inline_image_style' => array(
-        'required' => FALSE,
+        'required' => variable_get('ckeditor_inline_image_style_ckeditor_required', FALSE),
         'mappings' => $mappings,
-        'label' => variable_get('ckeditor_inline_image_style_ckeditor_label', 'Image style (required)'),
+        'label' => $label,
         'ckeditorDefaultMapping' => variable_get('ckeditor_inline_image_style_ckeditor_default_mapping', 'not_set'),
         'editorCSS' => ckeditor_inline_image_style_css(),
       )), 'setting');
