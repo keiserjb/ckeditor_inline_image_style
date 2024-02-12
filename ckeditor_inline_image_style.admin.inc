@@ -11,7 +11,7 @@
 function ckeditor_inline_image_style_admin_settings() {
   $form = array();
   $image_styles = image_styles();
-  $ckeditor_mappings = variable_get('ckeditor_inline_image_style_ckeditor_mappings', array_keys(image_styles()));
+  $ckeditor_mappings = config_get('ckeditor_inline_image_style.settings', 'ckeditor_inline_image_style_ckeditor_mappings');
 
   $options = array();
   foreach ($image_styles as $image_style) {
@@ -36,5 +36,5 @@ function ckeditor_inline_image_style_admin_settings() {
  * Submit handler.
  */
 function ckeditor_inline_image_style_admin_settings_submit($form, &$form_state) {
-  variable_set('ckeditor_inline_image_style_ckeditor_mappings', $form_state['values']['ckeditor_inline_image_style_ckeditor_mappings']);
+  config_set('ckeditor_inline_image_style.settings', 'ckeditor_inline_image_style_ckeditor_mappings', $form_state['values']['ckeditor_inline_image_style_ckeditor_mappings']);
 }

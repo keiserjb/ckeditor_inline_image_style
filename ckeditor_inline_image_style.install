@@ -1,0 +1,30 @@
+<?php
+/**
+ * @file
+ * Install, update and uninstall functions for the ckeditor_inline_image_style module.
+ *
+ */
+
+
+/**
+ * Migrate ckeditor_inline_image_style variables to config.
+ */
+function ckeditor_inline_image_style_update_1000() {
+  $config = config('ckeditor_inline_image_style.settings');
+  $config->set('ckeditor_inline_image_style_ckeditor_mappings', update_variable_get('ckeditor_inline_image_style_ckeditor_mappings', 'dynamic value in file /ckeditor_inline_image_style/ckeditor_inline_image_style.module line 90'));
+  $config->set('ckeditor_inline_image_style_ckeditor_label', update_variable_get('ckeditor_inline_image_style_ckeditor_label', 'Image style'));
+  $config->set('ckeditor_inline_image_style_ckeditor_required', update_variable_get('ckeditor_inline_image_style_ckeditor_required', array()));
+
+
+  update_variable_del('ckeditor_inline_image_style_ckeditor_mappings');
+  update_variable_del('ckeditor_inline_image_style_ckeditor_label');
+  update_variable_del('ckeditor_inline_image_style_ckeditor_required');
+}
+
+/**
+ * Implements hook_install().
+ */
+function ckeditor_inline_image_style_install() {
+  // Dynamically generated variable data was detected.
+  // /ckeditor_inline_image_style/ckeditor_inline_image_style.module line 90
+}
