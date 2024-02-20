@@ -17,9 +17,9 @@ CKEDITOR.plugins.add('backdropimage', {
   requires: 'image2,uploadwidget',
 
   onLoad: function() {
-    console.log('onLoad method called.'); // onLoad logging
     // Ensure Backdrop.settings.ckeditor_inline_image_style.editorCSS is defined
     CKEDITOR.addCss(Backdrop.settings.ckeditor_inline_image_style.editorCSS);
+    CKEDITOR.addCss('span[data-cke-display-name="image"] { display: block; }');
   },
 
   beforeInit: function (editor) {
@@ -27,7 +27,6 @@ CKEDITOR.plugins.add('backdropimage', {
     // additional data-file-id attribute.
     editor.on('widgetDefinition', function (event) {
       var widgetDefinition = event.data;
-      console.log('backdropimage');
       if (widgetDefinition.name !== 'image') {
         return;
       }
