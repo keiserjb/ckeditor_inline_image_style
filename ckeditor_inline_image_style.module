@@ -114,7 +114,6 @@ function ckeditor_inline_image_style_form_node_form_alter(&$form, &$form_state, 
 function ckeditor_inline_image_style_form_filter_format_editor_image_form_alter(  &$form, $form_state) {
   // Load module configuration.
   $config = config('ckeditor_inline_image_style.settings');
-
   // Ensure alterations apply only when CKEditor is used.
   $format = $form_state['format'];
   if ($format->editor !== 'ckeditor') {
@@ -125,7 +124,10 @@ function ckeditor_inline_image_style_form_filter_format_editor_image_form_alter(
   $filter_enabled
     = !empty($format->filters['ckeditor_inline_image_style']->status);
 
-  $values = [];
+
+  $values = isset($_SESSION['inline_image_styles_last_attributes']) ? $_SESSION['inline_image_styles_last_attributes'] : [];
+
+  //$values = [];
   if (isset($form_state['input']['editor_object'])) {
     $values = $form_state['input']['editor_object'];
   }
@@ -157,18 +159,17 @@ function ckeditor_inline_image_style_form_filter_format_editor_image_form_alter(
   $form['image_style'] = [
     '#title'              => t('Image Style'),
     '#type'               => 'select',
-    '#default_value'      => isset($values['data-image-style'])
-      ? $values['data-image-style'] : 'none',
+    '#default_value'      => isset($values['data-image-style']) ? $values['data-image-style'] : 'none',
     '#options'            => $options,
     '#wrapper_attributes' => ['class' => ['editor-data-image-style']],
     '#parents'            => ['attributes', 'data-image-style'],
     '#description'        => t('Choose the image style you want to apply.'),
-    '#weight'             => -1, // Adjust as necessary to position the element.
+    //'#weight'             => -1, // Adjust as necessary to position the element.
     '#access'             => $filter_enabled,
   ];
   // Adjust the AJAX callback for the form submission.
-  /*$form['actions']['submit']['#ajax']['callback']
-    = 'ckeditor_inline_image_style_format_editor_dialog_save';*/
+  $form['actions']['submit']['#ajax']['callback']
+    = 'ckeditor_inline_image_style_format_editor_dialog_save';
 }
 
 /**
@@ -177,6 +178,32 @@ function ckeditor_inline_image_style_form_filter_format_editor_image_form_alter(
 /**
  * Custom AJAX callback function for the CKEditor image dialog form submission.
  */
+
+function ckeditor_inline_image_style_format_editor_dialog_save($form, &$form_state) {
+  // First, invoke the original dialog save function to handle standard saving operations.
+  $return = filter_format_editor_dialog_save($form, $form_state);
+
+  // Check if the data-image-style attribute is set and handle it.
+  if (isset($form_state['values']['attributes']['data-image-style'])) {
+    $style_name = $form_state['values']['attributes']['data-image-style'];
+    // Update the command to include the data-image-style attribute.
+    // This assumes there's a command in $return that sets attributes for the image.
+    foreach ($return['#commands'] as &$command) {
+      if ($command['command'] === 'editorDialogSave') {
+        $command['values']['attributes']['data-image-style'] = $style_name;
+        break; // Exit the loop once the update is made.
+      }
+    }
+
+    // Store the selected image style in the session for retrieval in form_alter.
+    // This session variable can be used to remember the user's last selection.
+    $_SESSION['inline_image_styles_last_attributes']['data-image-style'] = $style_name;
+  }
+
+  return $return;
+}
+
+
 /*function ckeditor_inline_image_style_format_editor_dialog_save($form, &$form_state) {
   $return = filter_format_editor_dialog_save($form, $form_state);
   if (isset($return['#commands'][0]['values']['attributes']['data-file-id'])) {
@@ -186,16 +213,12 @@ function ckeditor_inline_image_style_form_filter_format_editor_image_form_alter(
         = $return['#commands'][0]['values']['attributes']['data-image-style'];
 
       $file = file_load($fid);
-      dpm($file);
       $path = ($style_name == 'none') ? file_create_url($file->uri)
-        : image_style_url($style_name, $file->uri);
-      dpm($path);
-      // Parse the URL to extract its components
+        : image_style_url($style_name, $file->uri);      // Parse the URL to extract its components
       $urlComponents = parse_url($path);
 
       // Extract the path component, which is the relative URL
       $relativePath = $urlComponents['path'];
-      dpm($relativePath);
 
       if ($return['#commands'][0]['values']['attributes']['src'] != $relativePath) {
         $form_state['values']['attributes']['src'] = $relativePath;
@@ -219,9 +242,11 @@ function ckeditor_inline_image_style_form_filter_format_editor_image_form_alter(
       }
     }
   }
-  dpm($form_state['values']);
+  // Store the attributes array in the user's session for retrieval in form_alter
+  $_SESSION['inline_image_styles_last_attributes'] = $form_state['values']['attributes'];
   return $return;
 }*/
+
 
 /**
  * Generate css to handle more realistic display of image styles.
@@ -229,40 +254,33 @@ function ckeditor_inline_image_style_form_filter_format_editor_image_form_alter(
 function ckeditor_inline_image_style_css($prefix = '') {
   $config = config('ckeditor_inline_image_style.settings');
   $image_styles = image_styles();
-  $ckeditor_mappings = $config->get(
-    'ckeditor_inline_image_style_ckeditor_mappings'
-  );
+  $ckeditor_mappings = $config->get('ckeditor_inline_image_style_ckeditor_mappings');
   $mappings = [];
-  // CKEditor library expects an array of options formatted as
-  // ['Display name', 'machine_name'].
+
   foreach ($ckeditor_mappings as $machine_name) {
-    if (array_key_exists($machine_name, $image_styles)) {
-      $dimensions = [
-        'width'  => 1000,
-        'height' => 1000,
-      ];
+    if (array_key_exists($machine_name, $image_styles) && !empty($image_styles[$machine_name]['effects'])) {
+      // Assuming the desired dimensions are always in the first effect's data
+      $effect = reset($image_styles[$machine_name]['effects']);
+      if (isset($effect['data']['width']) && isset($effect['data']['height'])) {
+        $dimensions = [
+          'width' => $effect['data']['width'],
+          'height' => $effect['data']['height'],
+        ];
 
-      // Transform dimensions.
-      image_style_transform_dimensions($machine_name, $dimensions);
-
-      // Add unit if needed.
-      if (strpos($dimensions['width'], '%') === FALSE) {
+        // Add 'px' unit
         $dimensions['width'] .= 'px';
-      }
-      if (strpos($dimensions['height'], '%') === FALSE) {
         $dimensions['height'] .= 'px';
-      }
 
-      $mappings[$machine_name] = $prefix . ' img[data-image-style="'
-        . $machine_name . '"] {';
-      $mappings[$machine_name] .= ' width: ' . $dimensions['width'] . ';';
-      $mappings[$machine_name] .= ' height: ' . $dimensions['height'] . ';';
-      $mappings[$machine_name] .= '}';
+        $mappings[$machine_name] = $prefix . ' img[data-image-style="' . $machine_name . '"] {';
+        $mappings[$machine_name] .= ' width: ' . $dimensions['width'] . ';';
+        $mappings[$machine_name] .= ' height: ' . $dimensions['height'] . ';';
+        $mappings[$machine_name] .= '}';
+      }
     }
   }
-  dpm($mappings);
   return implode("\n", $mappings);
 }
+
 
 /**
  * Implements hook_ckeditor_plugins().
@@ -270,7 +288,7 @@ function ckeditor_inline_image_style_css($prefix = '') {
  * Registers a CKEditor plugin to allow selection of image styles within
  * CKEditor, without adding a button to the toolbar.
  */
-/*function ckeditor_inline_image_style_ckeditor_plugins() {
+function ckeditor_inline_image_style_ckeditor_plugins() {
   $module_path = backdrop_get_path('module', 'ckeditor_inline_image_style');
   $plugin_path = $module_path . '/ckeditor/plugins/';
   $plugins['ckeditor_inline_image_style_ckeditor'] = [
@@ -280,14 +298,14 @@ function ckeditor_inline_image_style_css($prefix = '') {
     'enabled callback' => 'ckeditor_inline_image_style_plugin_check',
   ];
   return $plugins;
-}*/
+}
 
 /**
  * Callback to enable ckeditor inline image style plugin.
  */
-/*function ckeditor_inline_image_style_plugin_check($format, $plugin_name) {
+function ckeditor_inline_image_style_plugin_check($format, $plugin_name) {
   return $format->editor_settings['ckeditor_inline_image_style_ckeditor']['status'];
-}*/
+}
 
 /**
  * Implements hook_ckeditor_plugins_alter().
@@ -339,7 +357,7 @@ function ckeditor_inline_image_style_ckeditor_plugins_alter(&$plugins) {
  *
  * Add settings for Ckeditor Inline Image Style plugin.
  */
-/*function ckeditor_inline_image_style_form_filter_admin_format_form_alter(&$form, $form_state) {
+function ckeditor_inline_image_style_form_filter_admin_format_form_alter(&$form, $form_state) {
   // Defaults.
   $settings
     = isset($form_state['format']->editor_settings['ckeditor_inline_image_style_ckeditor'])
@@ -373,23 +391,7 @@ function ckeditor_inline_image_style_ckeditor_plugins_alter(&$plugins) {
       'ckeditorInlineImageSyles' => 'status',
     ],
   ];
-}*/
-
-/**
- * Implements hook_wysiwyg_editor_settings_alter().
- */
-/*function ckeditor_inline_image_style_wysiwyg_editor_settings_alter(&$settings, $context) {
-  if ($context['profile']->editor == 'ckeditor') {
-    if (!isset($settings['extraAllowedContent'])) {
-      $settings['extraAllowedContent'] = array(
-        'img[src,title,alt,style,width,height,class,hspace,vspace,view_mode,format,fid,data-picture-mapping,data-picture-group,data-picture-align,data-image-style]',
-      );
-    }
-    else {
-      // @todo: try finding the img entry and add data- attributes if needed.
-    }
-  }
-}*/
+}
 
 /**
  * Implements hook_filter_info().
@@ -419,11 +421,15 @@ function _ckeditor_inline_image_style_filter_process($text) {
       if (!$image_render_array) {
         continue;
       }
-      // Extract the styled image URL.
+      // Extract the styled image URL, width, and height.
       $styled_image_url = $image_render_array['#path'];
+      $styled_width = $image_render_array['#width'];
+      $styled_height = $image_render_array['#height'];
 
-      // Replace only the src attribute within the original image tag.
+      // Replace the src, width, and height attributes within the original image tag.
       $new_image = preg_replace('/src="[^"]*"/i', 'src="' . check_plain($styled_image_url) . '"', $image);
+      $new_image = preg_replace('/width="[^"]*"/i', 'width="' . $styled_width . '"', $new_image);
+      $new_image = preg_replace('/height="[^"]*"/i', 'height="' . $styled_height . '"', $new_image);
 
       // Replace the original img tag with the new one in the text.
       $text = str_replace($image, $new_image, $text);
@@ -496,7 +502,6 @@ function _ckeditor_inline_image_style_filter_prepare_image($image) {
 
 
   $image_info = image_get_info($uri);
-
   if (!$image_info) {
     // It's not an image.
     return FALSE;
@@ -507,20 +512,40 @@ function _ckeditor_inline_image_style_filter_prepare_image($image) {
   } else {
     $styled_image_url = file_create_url($uri);
   }
-  // Construct the image render array.
+  // Directly access styled image dimensions
+  if ($image_style != 'none' && !empty($image_styles[$image_style]['effects'])) {
+    $effect = reset($image_styles[$image_style]['effects']); // Assuming the first effect contains dimension data
+    if (isset($effect['data']['width']) && isset($effect['data']['height'])) {
+      $styled_width = $effect['data']['width'];
+      $styled_height = $effect['data']['height'];
+    }
+  } else {
+    $styled_image_url = file_create_url($uri);
+    // Optionally, fall back to original dimensions if no style is applied
+    $styled_width = $image_info['width'];
+    $styled_height = $image_info['height'];
+  }
+
+  // Make sure we have valid dimensions and a styled image URL
+  if (!isset($styled_width) || !isset($styled_height)) {
+    return FALSE; // or handle the error as needed
+  }
+
+  if (!isset($styled_image_url)) {
+    $styled_image_url = image_style_url($image_style, $uri);
+  }
+
+  // Construct the image render array using the styled dimensions.
   $image_render_array = [
     '#theme'      => 'image_style',
     '#style_name' => $image_style,
     '#path'       => $styled_image_url,
-    '#width'      => $image_info['width'],
-    '#height'     => $image_info['height'],
+    '#width'      => $styled_width,
+    '#height'     => $styled_height,
     '#alt'        => $alt,
     '#title'      => $title,
-    '#attributes' => [
-        'data-image-style' => $image_style,
-      ] + $attributes,
+    '#attributes' => ['data-image-style' => $image_style] + $attributes,
   ];
-
   return $image_render_array;
 }
 

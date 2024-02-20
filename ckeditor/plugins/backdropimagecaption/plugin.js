@@ -15,9 +15,6 @@ CKEDITOR.plugins.add('backdropimagecaption', {
   requires: 'backdropimage',
 
   onLoad: function() {
-    // Ensure Backdrop.settings.ckeditor_inline_image_style.editorCSS is defined
-    CKEDITOR.addCss(Backdrop.settings.ckeditor_inline_image_style.editorCSS);
-    CKEDITOR.addCss('span[data-cke-display-name="image"] { display: block; }');
   },
 
   beforeInit: function (editor) {

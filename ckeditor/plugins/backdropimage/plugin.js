@@ -17,9 +17,6 @@ CKEDITOR.plugins.add('backdropimage', {
   requires: 'image2,uploadwidget',
 
   onLoad: function() {
-    // Ensure Backdrop.settings.ckeditor_inline_image_style.editorCSS is defined
-    CKEDITOR.addCss(Backdrop.settings.ckeditor_inline_image_style.editorCSS);
-    CKEDITOR.addCss('span[data-cke-display-name="image"] { display: block; }');
   },
 
   beforeInit: function (editor) {
@@ -44,7 +41,6 @@ CKEDITOR.plugins.add('backdropimage', {
       // the element is already correct. We only need to update the element's
       // data-file-id attribute.
       widgetDefinition.downcast = function (element) {
-        console.log('Downcast called for element:', element);
         //element.attributes['data-file-id'] = this.data['data-file-id'];
         if (this.data['data-file-id'] && this.data['data-file-id'] != '') {
           element.attributes['data-file-id'] = this.data['data-file-id'];
@@ -62,7 +58,6 @@ CKEDITOR.plugins.add('backdropimage', {
       // image2 widget; we only accept an <img> tag, and that <img> tag MAY
       // have a data-file-id attribute.
       widgetDefinition.upcast = function (element, data) {
-        console.log('Upcast called for element:', element.name);
         if (element.name !== 'img') {
           return;
         }
@@ -84,7 +79,6 @@ CKEDITOR.plugins.add('backdropimage', {
         else {
           data['data-image-style'] = 'none';
         }
-        console.log('Upcast data:', data);
         return element;
       };
 
@@ -189,8 +183,6 @@ CKEDITOR.plugins.add('backdropimage', {
             // Save snapshot for undo support.
             editor.fire('saveSnapshot');
           });
-          // Example place to add logging might be in dialog definition or save callback
-          console.log("Dialog Save Callback", dialogReturnValues);
           return widget;
         };
       };
