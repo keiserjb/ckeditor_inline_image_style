@@ -37,6 +37,42 @@ CKEDITOR.plugins.add('backdropimagecaption', {
         return;
       }
 
+      // Capture the original init method of the widget
+      var originalInit = widgetDefinition.init;
+
+      // Override the widget's init method
+      widgetDefinition.init = function() {
+        // Call the original init method first
+        if (originalInit) {
+          originalInit.call(this);
+        }
+
+        // Now attach a listener for data changes
+        this.on('data', function() {
+          var newStyle = this.data['data-image-style'];
+          console.log(newStyle);
+          if (newStyle) {
+            // Apply changes or refresh logic here
+            // For example, adjusting the widget's DOM element
+            var imgElement = this.element.findOne('img');
+            if (imgElement) {
+              imgElement.setAttribute('data-image-style', newStyle);
+            }
+          }
+        });
+        // Apply alignment styles or classes
+        var alignment = this.data.align;
+        if (alignment === 'center') {
+          // This assumes you have a CSS class that correctly centers elements
+          // within the CKEditor content area. Adjust the class name as needed.
+          this.element.addClass('editor-align-center');
+
+          // Alternatively, apply styles directly if you prefer
+          // this.element.setStyle('text-align', 'center');
+        }
+      };
+
+
       // Only perform the downcasting/upcasting for the enabled filters.
       var captionFilterEnabled = editor.config.backdrop.captionFilterEnabled;
       var alignFilterEnabled = editor.config.backdrop.alignFilterEnabled;
@@ -48,12 +84,15 @@ CKEDITOR.plugins.add('backdropimagecaption', {
         },
         align: {
           requiredContent: 'img[data-align]'
+        },
+        style: {
+          requiredContent: 'img[data-image-style]'
         }
       }, true);
 
       // Override requiredContent & allowedContent.
       widgetDefinition.requiredContent = 'img[alt,src,width,height,data-align,data-caption]';
-      widgetDefinition.allowedContent.img.attributes += ',data-align,data-caption';
+      widgetDefinition.allowedContent.img.attributes += ',data-align,data-caption, data-image-style';
 
       // Override allowedContent setting for the 'caption' nested editable.
       // This must match what caption_filter enforces.
@@ -62,6 +101,8 @@ CKEDITOR.plugins.add('backdropimagecaption', {
       // Override downcast(): ensure we *only* output <img>, but also ensure
       // we include the data-file-id, data-align, and data-caption attributes.
       widgetDefinition.downcast = function (element) {
+        // Logging the element being downcast
+        //console.log("Downcasting element:", element);
         // Find an image element in the one being downcast (can be itself).
         var img = findElementByName(element, 'img');
         var caption = this.editables.caption;
@@ -93,6 +134,8 @@ CKEDITOR.plugins.add('backdropimagecaption', {
           delete attrs['data-image-style'];
         }
 
+        //console.log("Downcast attributes:", attrs);
+
         // CKEditor seems to apply the caption class to downcast elements, which
         // we do not want. Make sure that the caption class doesn't end up in
         // the raw source.
@@ -117,6 +160,15 @@ CKEDITOR.plugins.add('backdropimagecaption', {
       //   - <figure> tag (captioned image).
       // We take the same attributes into account as downcast() does.
       widgetDefinition.upcast = function (element, data) {
+       // console.log("Upcasting element, available attributes:", element.attributes);
+
+        // Your existing logic to process data-image-style
+        if (element.attributes['data-image-style']) {
+        //  console.log("Found data-image-style:", element.attributes['data-image-style']);
+          data['data-image-style'] = element.attributes['data-image-style'];
+        } else {
+        //  console.log("data-image-style attribute not found.");
+        }
         if (element.name !== 'img') {
           return;
         }
@@ -151,8 +203,9 @@ CKEDITOR.plugins.add('backdropimagecaption', {
         }
         data['data-file-id'] = attrs['data-file-id'];
         delete attrs['data-file-id'];
+
         data['data-image-style'] = attrs['data-image-style'];
-        delete attrs['data-image-style'];
+       // delete attrs['data-image-style'];
 
         if (captionFilterEnabled) {
           // Unwrap from <p> wrapper created by HTML parser for a captioned

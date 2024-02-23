@@ -1,3 +1,10 @@
 .cke_image_resizer {
   display: none !important;
 }
+
+.align-center .caption-img {
+  margin-left: auto;
+  margin-right: auto;
+  /* If the .caption-img is an image, text-align on the parent isn't needed */
+}
+

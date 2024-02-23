@@ -24,6 +24,7 @@ CKEDITOR.plugins.add('backdropimage', {
     // additional data-file-id attribute.
     editor.on('widgetDefinition', function (event) {
       var widgetDefinition = event.data;
+      //console.log(event.data);
       if (widgetDefinition.name !== 'image') {
         return;
       }
@@ -41,26 +42,29 @@ CKEDITOR.plugins.add('backdropimage', {
       // the element is already correct. We only need to update the element's
       // data-file-id attribute.
       widgetDefinition.downcast = function (element) {
-        //element.attributes['data-file-id'] = this.data['data-file-id'];
-        if (this.data['data-file-id'] && this.data['data-file-id'] != '') {
+        console.log(element.attributes);
+        element.attributes['data-file-id'] = this.data['data-file-id'];
+        /*if (this.data['data-file-id'] && this.data['data-file-id'] != '') {
           element.attributes['data-file-id'] = this.data['data-file-id'];
         } else if (element.attributes['data-file-id']) {
           delete element.attributes['data-file-id'];
-        }
-        //element.attributes['data-image-style'] = this.data['data-image-style'];
-        if (this.data['data-image-style'] && this.data['data-image-style'] != 'none') {
+        }*/
+        element.attributes['data-image-style'] = this.data['data-image-style'];
+        /*if (this.data['data-image-style'] && this.data['data-image-style'] != 'none') {
           element.attributes['data-image-style'] = this.data['data-image-style'];
         } else if (element.attributes['data-image-style']) {
           delete element.attributes['data-image-style'];
-        }
+        }*/
       };
       // We want to upcast <img> elements to a DOM structure required by the
       // image2 widget; we only accept an <img> tag, and that <img> tag MAY
       // have a data-file-id attribute.
       widgetDefinition.upcast = function (element, data) {
+        //console.log("Upcasting element:", element);
         if (element.name !== 'img') {
           return;
         }
+
         // Don't initialize on pasted fake objects.
         else if (element.attributes['data-cke-realelement']) {
           return;
@@ -79,6 +83,7 @@ CKEDITOR.plugins.add('backdropimage', {
         else {
           data['data-image-style'] = 'none';
         }
+        console.log(element);
         return element;
       };
 
