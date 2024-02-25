@@ -6,7 +6,6 @@
   CKEDITOR.plugins.add('ckeditor_inline_image_style_ckeditor', {
 
     onLoad: function() {
-      console.log('plugin loaded');
       CKEDITOR.addCss(Backdrop.settings.ckeditor_inline_image_style.editorCSS);
 
     },
@@ -17,7 +16,6 @@
       CKEDITOR.addCss('span[data-cke-display-name="image"] { display: block; }');
       CKEDITOR.config.disableObjectResizing = true;
     }
-
   });
 
 })(jQuery, Backdrop, CKEDITOR);

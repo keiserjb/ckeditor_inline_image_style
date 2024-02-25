@@ -17,14 +17,21 @@ CKEDITOR.plugins.add('backdropimage', {
   requires: 'image2,uploadwidget',
 
   onLoad: function() {
+    CKEDITOR.addCss(Backdrop.settings.ckeditor_inline_image_style.editorCSS);
+
   },
 
   beforeInit: function (editor) {
+    /*features = {
+      'imageSize': { 'requiredContent': 'img[data-image-style]' }
+    };*/
+    CKEDITOR.addCss('span[data-cke-display-name="image"] { display: block; }');
+    CKEDITOR.config.disableObjectResizing = true;
+
     // Override the image2 widget definition to require and handle the
     // additional data-file-id attribute.
     editor.on('widgetDefinition', function (event) {
       var widgetDefinition = event.data;
-      //console.log(event.data);
       if (widgetDefinition.name !== 'image') {
         return;
       }
@@ -42,7 +49,6 @@ CKEDITOR.plugins.add('backdropimage', {
       // the element is already correct. We only need to update the element's
       // data-file-id attribute.
       widgetDefinition.downcast = function (element) {
-        console.log(element.attributes);
         element.attributes['data-file-id'] = this.data['data-file-id'];
         /*if (this.data['data-file-id'] && this.data['data-file-id'] != '') {
           element.attributes['data-file-id'] = this.data['data-file-id'];
@@ -60,7 +66,6 @@ CKEDITOR.plugins.add('backdropimage', {
       // image2 widget; we only accept an <img> tag, and that <img> tag MAY
       // have a data-file-id attribute.
       widgetDefinition.upcast = function (element, data) {
-        //console.log("Upcasting element:", element);
         if (element.name !== 'img') {
           return;
         }
@@ -83,7 +88,6 @@ CKEDITOR.plugins.add('backdropimage', {
         else {
           data['data-image-style'] = 'none';
         }
-        console.log(element);
         return element;
       };
 

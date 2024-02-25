@@ -17,7 +17,6 @@ Bugs and feature requests should be reported in the [Issue Queue](https://github
 ## Credits
 
 - Ported to Backdrop CMS by [Justin Keiser](https://github.com/keiserjb).
-- Inspiration provided by the [ckeditor_add](https://github.com/backdrop-contrib/ckeditor_addon) module that was abandoned in Backdrop.
 - Created for Drupal 7 by [attiks](https://www.drupal.org/u/attiks).
 
 ## License

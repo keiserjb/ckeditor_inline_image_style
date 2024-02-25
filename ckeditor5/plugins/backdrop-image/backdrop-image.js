@@ -39,6 +39,10 @@
      * @inheritdoc
      */
     init() {
+
+      // Call the method to inject custom CSS
+      this._injectCustomCss();
+
       const editor = this.editor;
       const { conversion } = editor;
       const { schema } = editor.model;
@@ -50,17 +54,12 @@
         return;
       }
 
-      // Add extra supported attributes to the image models.
-      if (schema.isRegistered('imageInline')) {
-        schema.extend('imageInline', {
-          allowAttributes: ['data-image-style', ...Object.keys(config.extraAttributes)]
-        });
-      }
-      if (schema.isRegistered('imageBlock')) {
-        schema.extend('imageBlock', {
-          allowAttributes: ['data-image-style', ...Object.keys(config.extraAttributes)]
-        });
-      }
+      // Allow data-image-style attribute for imageBlock and imageInline.
+      editor.model.schema.extend('imageBlock', { allowAttributes: ['data-image-style'] });
+      editor.model.schema.extend('imageInline', { allowAttributes: ['data-image-style'] });
+
+      // Your existing initialization code...
+      this._defineConverters(); // Call the converter definitions.
 
       // Upcast from the raw <img> element to the CKEditor model.
       conversion
@@ -107,6 +106,8 @@
         })
         // Convert ImageStyle to data-align attribute.
         .add(modelImageStyleToDataAttribute(editor))
+        // Backdrop image style.
+        .add(modelDataImageStyleToDataAttribute(editor))
         // Convert height and width attributes.
         .add(modelImageWidthAndHeightToAttributes(editor))
         // Convert any link to wrap the <img> tag.
@@ -186,10 +187,74 @@
           writer.setAttribute('dataFileId', data.response.fileId, imageElement);
         });
       });
+
+    }
+
+    /**
+     * Method for injecting custom CSS into the document.
+     * This is defined within the class body but outside and after the `init` method.
+     */
+    _injectCustomCss() {
+      const cssContent = Backdrop.settings.ckeditor_inline_image_style.editorCSS; // Assuming this is your CSS content
+      const styleTag = document.createElement('style');
+      styleTag.type = 'text/css';
+      styleTag.textContent = cssContent;
+      document.head.appendChild(styleTag);
+    }
+
+    _defineConverters() {
+      const editor = this.editor;
+
+      // Register upcast and downcast converters with debugging
+      editor.conversion.for('upcast').add(upcastDataImageStyle());
+      editor.conversion.for('downcast').add(downcastDataImageStyle('imageBlock'));
+      editor.conversion.for('downcast').add(downcastDataImageStyle('imageInline'));
     }
   }
 
-  // Expose the plugin to the CKEditor5 namespace.
+    // Upcast converter for data-image-style with debugging
+  // Upcast converter for data-image-style
+  function upcastDataImageStyle() {
+    return dispatcher => dispatcher.on('element:img', (evt, data, conversionApi) => {
+      const viewItem = data.viewItem;
+      const modelRange = data.modelRange;
+      const modelElement = modelRange && modelRange.start.nodeAfter;
+
+      if (modelElement) {
+        const dataImageStyle = viewItem.getAttribute('data-image-style');
+        if (dataImageStyle) {
+          conversionApi.writer.setAttribute('dataImageStyle', dataImageStyle, modelElement);
+        }
+      }
+    });
+  }
+
+    // Downcast converter for data-image-style with debugging
+    function downcastDataImageStyle(modelElementName) {
+      return (dispatcher) =>
+        dispatcher.on(`attribute:dataImageStyle:${modelElementName}`, (evt, data, conversionApi) => {
+          const { writer, mapper } = conversionApi;
+          const figure = mapper.toViewElement(data.item);
+          const img = findChildInView(figure, 'img', writer);
+
+          if (img) {
+            writer.setAttribute('data-image-style', data.attributeNewValue || '', img);
+          }
+        });
+    }
+
+    function findChildInView(parentViewElement, childViewName, viewWriter) {
+      for (const child of viewWriter.createRangeIn(parentViewElement).getItems()) {
+        if (child.is('element', childViewName)) {
+          return child;
+        }
+      }
+      return null;
+    }
+
+
+
+    // Expose the plugin to the CKEditor5 namespace.
   CKEditor5.backdropImage = {
     'BackdropImage': BackdropImage
   };
@@ -447,32 +512,38 @@
    *
    * @private
    */
-  /*function modelDataImageStyleToDataAttribute(editor) {
-    /!**
-     * Downcast conversion for the dataImageStyle model attribute to data-image-style in the view.
-     *!/
+  function modelDataImageStyleToDataAttribute(editor) {
+    /**
+     * Callback for the attribute:dataImageStyle event.
+     *
+     * Saves the custom image style value to the data-image-style attribute.
+     */
     function converter(event, data, conversionApi) {
-      const { item, attributeNewValue } = data;
-      const { writer, consumable } = conversionApi;
+      const { item } = data;
+      const { consumable, writer } = conversionApi;
 
-      // Ensure the attribute is consumable before proceeding.
-      if (!consumable.consume(item, event.name)) {
+      // The attribute name in your model that holds the value for data-image-style
+      const imageStyleValue = item.getAttribute('dataImageStyle');
+
+      if (!imageStyleValue || !consumable.consume(item, 'attribute:dataImageStyle')) {
+        console.log("No imageStyleValue found or not consumable");
         return;
       }
 
+      const imageUtils = editor.plugins.get('ImageUtils');
       const viewElement = conversionApi.mapper.toViewElement(item);
-      // Apply the data-image-style attribute directly to the <img> element in the view.
-      writer.setAttribute('data-image-style', attributeNewValue, viewElement);
+      const img = imageUtils.findViewImgElement(viewElement);
+
+      writer.setAttribute('data-image-style', imageStyleValue, img);
     }
 
     return (dispatcher) => {
-      // Listen for changes to the dataImageStyle attribute on both imageBlock and imageInline elements.
-      dispatcher.on('attribute:dataImageStyle:imageBlock', converter, { priority: 'high' });
-      dispatcher.on('attribute:dataImageStyle:imageInline', converter, { priority: 'high' });
+      dispatcher.on('attribute:dataImageStyle', converter, { priority: 'high' });
     };
-  }*/
+  }
 
-  /**
+
+   /**
    * Generates a callback that saves data-align attribute on data downcast.
    *
    * @return {function}
@@ -595,14 +666,6 @@
      */
     function converter(event, data, conversionApi) {
       const { viewItem } = data;
-      // Log the entire <img> element as it comes in
-      console.log('Incoming <img> viewItem:', viewItem);
-      // For specific attribute logging
-      console.log('Incoming src attribute:', viewItem.getAttribute('src'));
-      console.log('Incoming data-file-id attribute:', viewItem.getAttribute('data-file-id'));
-      console.log('Incoming data-caption attribute:', viewItem.getAttribute('data-caption'));
-      console.log('Incoming data-align attribute:', viewItem.getAttribute('data-align'));
-      console.log('Incoming data-image-style attribute:', viewItem.getAttribute('data-image-style'));
 
       const { writer, consumable, safeInsert, updateConversionResult, schema } = conversionApi;
       const attributesToConsume = [];
@@ -628,10 +691,13 @@
         });
       }
 
+      // Handling data-image-style
       const dataImageStyle = viewItem.getAttribute('data-image-style');
       if (dataImageStyle) {
+        // Note: Make sure 'dataImageStyle' is allowed in the schema for image elements
         writer.setAttribute('dataImageStyle', dataImageStyle, image);
         attributesToConsume.push('data-image-style');
+        console.log('data-image-style attribute processed:', dataImageStyle);
       }
 
       if (editor.plugins.has('ImageStyleEditing') && consumable.test(viewItem, { name: true, attributes: 'data-align' })) {
@@ -640,6 +706,7 @@
         if (imageStyle) {
           writer.setAttribute('imageStyle', imageStyle, image);
           attributesToConsume.push('data-align');
+          console.log('data-image-style attribute processed:', imageStyle);
         }
       }
 
@@ -819,6 +886,10 @@
       let existingValues = {};
 
       if (imageElement) {
+        // Debugging: Log the model element and all its attributes
+        //console.log("Current image model element:", imageElement);
+        // Assuming 'dataImageStyle' is the model attribute for data-image-style
+        existingValues['data-image-style'] = imageElement.getAttribute('dataImageStyle');
         // Most attributes can be directly mapped from the model.
         extraAttributes.forEach((attributeName, modelName) => {
           existingValues[attributeName] = imageElement.getAttribute(modelName);
@@ -846,30 +917,42 @@
           const captionValue = editor.data.processor.toData(imageCaption.getChild(0));
           existingValues['data-caption'] = captionValue;
         }
+        console.log("Existing Values:", existingValues);
       }
 
       const saveCallback = (dialogValues) => {
+        console.log("Dialog Values:", dialogValues);
         // Map the submitted form values to the CKEditor image model.
         let imageAttributes = {};
+
         extraAttributes.forEach((attributeName, modelName) => {
           if (dialogValues.attributes[attributeName] !== undefined) {
             imageAttributes[modelName] = dialogValues.attributes[attributeName];
           }
         });
+        // Handle data-align independently
+        if (dialogValues.attributes['data-align'] !== undefined) {
+          const imageStyle = _getModelImageStyleFromDataAttribute(dialogValues.attributes['data-align']);
+          imageAttributes['imageStyle'] = imageStyle;
+        }
 
-        // Set CKEditor Image Style from the data-align attribute as imageStyle.
-        const imageStyle = _getModelImageStyleFromDataAttribute(dialogValues.attributes['data-align']);
-        imageAttributes['imageStyle'] = imageStyle;
-        if (imageAttributes.hasOwnProperty('dataAlign')) {
-          delete imageAttributes['dataAlign'];
+        // Directly applying or preserving data-image-style
+        if (dialogValues.attributes['data-image-style'] !== undefined) {
+          imageAttributes['dataImageStyle'] = dialogValues.attributes['data-image-style'];
+        } else if (existingValues['data-image-style'] !== undefined) {
+          // Preserve existing data-image-style if not being explicitly changed
+          imageAttributes['dataImageStyle'] = existingValues['data-image-style'];
         }
 
         // For updating an existing element:
         if (imageElement) {
+          console.log("Before setting attributes, imageElement attributes:", [...imageElement.getAttributeKeys()].map(key => `${key}: ${imageElement.getAttribute(key)}`));
           model.change((writer) => {
             writer.removeAttribute('resizedWidth', imageElement);
             writer.setAttributes(imageAttributes, imageElement);
           });
+          console.log("After setting attributes, imageElement attributes:", [...imageElement.getAttributeKeys()].map(key => `${key}: ${imageElement.getAttribute(key)}`));
+
 
           // If width/height are empty, set to their natural values.
           if (imageAttributes['width'] === '' && imageAttributes['height'] === '') {
@@ -894,7 +977,6 @@
           if (imageAttributes.hasOwnProperty('imageStyle') && !imageAttributes['imageStyle']) {
             delete imageAttributes['imageStyle'];
           }
-
           // Inserting an image has an unusual way of passing the attributes.
           // See https://ckeditor.com/docs/ckeditor5/latest/api/module_image_image_insertimagecommand-InsertImageCommand.html
           editor.execute('insertImage', { source: [imageAttributes] });
@@ -904,6 +986,7 @@
             editor.execute('toggleImageCaption', { focusCaptionOnShow: true });
           }
         }
+        console.log("Image Attributes:", imageAttributes);
       };
 
       const dialogSettings = {

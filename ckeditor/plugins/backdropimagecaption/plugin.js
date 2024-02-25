@@ -15,9 +15,16 @@ CKEDITOR.plugins.add('backdropimagecaption', {
   requires: 'backdropimage',
 
   onLoad: function() {
+    CKEDITOR.addCss(Backdrop.settings.ckeditor_inline_image_style.editorCSS);
   },
 
   beforeInit: function (editor) {
+
+    /*features = {
+      'imageSize': { 'requiredContent': 'img[data-image-style]' }
+    };*/
+    CKEDITOR.addCss('span[data-cke-display-name="image"] { display: block; }');
+    CKEDITOR.config.disableObjectResizing = true;
 
     // Backdrop.t() will not work inside CKEditor plugins because CKEditor loads
     // the JavaScript file instead of Backdrop. Pull translated strings from the
@@ -101,8 +108,6 @@ CKEDITOR.plugins.add('backdropimagecaption', {
       // Override downcast(): ensure we *only* output <img>, but also ensure
       // we include the data-file-id, data-align, and data-caption attributes.
       widgetDefinition.downcast = function (element) {
-        // Logging the element being downcast
-        //console.log("Downcasting element:", element);
         // Find an image element in the one being downcast (can be itself).
         var img = findElementByName(element, 'img');
         var caption = this.editables.caption;
@@ -134,8 +139,6 @@ CKEDITOR.plugins.add('backdropimagecaption', {
           delete attrs['data-image-style'];
         }
 
-        //console.log("Downcast attributes:", attrs);
-
         // CKEditor seems to apply the caption class to downcast elements, which
         // we do not want. Make sure that the caption class doesn't end up in
         // the raw source.
@@ -160,7 +163,6 @@ CKEDITOR.plugins.add('backdropimagecaption', {
       //   - <figure> tag (captioned image).
       // We take the same attributes into account as downcast() does.
       widgetDefinition.upcast = function (element, data) {
-       // console.log("Upcasting element, available attributes:", element.attributes);
 
         // Your existing logic to process data-image-style
         if (element.attributes['data-image-style']) {

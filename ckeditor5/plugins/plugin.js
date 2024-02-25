@@ -6,7 +6,7 @@
   CKEDITOR.plugins.add('ckeditor_inline_image_style_ckeditor', {
 
     onLoad: function() {
-      console.log('plugin loaded');
+      console.log('plugin loaded from ckeditor5 folder');
       CKEDITOR.addCss(Backdrop.settings.ckeditor_inline_image_style.editorCSS);
 
     },
