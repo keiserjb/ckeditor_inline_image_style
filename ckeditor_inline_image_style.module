@@ -282,44 +282,6 @@ function ckeditor_inline_image_style_css($prefix = '') {
   return implode("\n", $mappings);
 }
 
-
-/**
- * Implements hook_ckeditor_plugins().
- *
- * Registers a CKEditor plugin to allow selection of image styles within
- * CKEditor, without adding a button to the toolbar.
- */
-function ckeditor_inline_image_style_ckeditor_plugins() {
-  $module_path = backdrop_get_path('module', 'ckeditor_inline_image_style');
-  $plugin_path = $module_path . '/ckeditor/plugins/';
-  $plugins['ckeditor_inline_image_style_ckeditor'] = [
-    'path'             => $plugin_path,
-    'file'             => 'plugin.js',
-    'internal'         => FALSE,
-    'enabled callback' => 'ckeditor_inline_image_style_plugin_check',
-  ];
-  return $plugins;
-}
-
-function ckeditor_inline_image_style_ckeditor5_plugins() {
-  $module_path = backdrop_get_path('module', 'ckeditor_inline_image_style');
-  $plugin_path = $module_path . '/ckeditor5/plugins/';
-  $plugins['ckeditor_inline_image_style_ckeditor'] = [
-    'path'             => $plugin_path,
-    'file'             => 'plugin.js',
-    'internal'         => FALSE,
-    'enabled callback' => 'ckeditor_inline_image_style_plugin_check',
-  ];
-  return $plugins;
-}
-
-/**
- * Callback to enable ckeditor inline image style plugin.
- */
-function ckeditor_inline_image_style_plugin_check($format, $plugin_name) {
-  return $format->editor_settings['ckeditor_inline_image_style_ckeditor']['status'];
-}
-
 /**
  * Implements hook_ckeditor_plugins_alter().
  */
