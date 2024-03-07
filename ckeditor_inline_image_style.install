@@ -11,14 +11,14 @@
  */
 function ckeditor_inline_image_style_update_1000() {
   $config = config('ckeditor_inline_image_style.settings');
-  $config->set('ckeditor_inline_image_style_ckeditor_mappings', update_variable_get('ckeditor_inline_image_style_ckeditor_mappings', 'dynamic value in file /ckeditor_inline_image_style/ckeditor_inline_image_style.module line 90'));
-  $config->set('ckeditor_inline_image_style_ckeditor_label', update_variable_get('ckeditor_inline_image_style_ckeditor_label', 'Image style'));
-  $config->set('ckeditor_inline_image_style_ckeditor_required', update_variable_get('ckeditor_inline_image_style_ckeditor_required', array()));
+  $config->set('ckeditor_inline_image_style_mappings', update_variable_get('ckeditor_inline_image_style_mappings', 'dynamic value in file /ckeditor_inline_image_style/ckeditor_inline_image_style.module line 90'));
+  $config->set('ckeditor_inline_image_style_label', update_variable_get('ckeditor_inline_image_style_label', 'Image style'));
+  $config->set('ckeditor_inline_image_style_required', update_variable_get('ckeditor_inline_image_style_required', array()));
 
 
-  update_variable_del('ckeditor_inline_image_style_ckeditor_mappings');
-  update_variable_del('ckeditor_inline_image_style_ckeditor_label');
-  update_variable_del('ckeditor_inline_image_style_ckeditor_required');
+  update_variable_del('ckeditor_inline_image_style_mappings');
+  update_variable_del('ckeditor_inline_image_style_label');
+  update_variable_del('ckeditor_inline_image_style_required');
 }
 
 /**

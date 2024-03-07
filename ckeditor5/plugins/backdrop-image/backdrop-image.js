@@ -211,8 +211,6 @@
       editor.conversion.for('downcast').add(downcastDataImageStyle('imageInline'));
     }
   }
-
-    // Upcast converter for data-image-style with debugging
   // Upcast converter for data-image-style
   function upcastDataImageStyle() {
     return dispatcher => dispatcher.on('element:img', (evt, data, conversionApi) => {

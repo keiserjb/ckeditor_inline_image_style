@@ -1,4 +1,4 @@
-.ck-widget__resizer {
+.ck-focused .ck-widget_with-resizer.ck-widget_selected>.ck-widget__resizer {
   display: none !important;
 }
 
