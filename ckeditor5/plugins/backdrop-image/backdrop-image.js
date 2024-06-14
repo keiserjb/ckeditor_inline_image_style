@@ -227,32 +227,34 @@
     });
   }
 
-    // Downcast converter for data-image-style with debugging
-    function downcastDataImageStyle(modelElementName) {
-      return (dispatcher) =>
-        dispatcher.on(`attribute:dataImageStyle:${modelElementName}`, (evt, data, conversionApi) => {
-          const { writer, mapper } = conversionApi;
-          const figure = mapper.toViewElement(data.item);
-          const img = findChildInView(figure, 'img', writer);
 
-          if (img) {
-            writer.setAttribute('data-image-style', data.attributeNewValue || '', img);
-          }
-        });
-    }
+  // Downcast converter for data-image-style with debugging
+  function downcastDataImageStyle(modelElementName) {
+    return dispatcher =>
+      dispatcher.on(`attribute:dataImageStyle:${modelElementName}`, (evt, data, conversionApi) => {
+        const { writer, mapper } = conversionApi;
+        const figure = mapper.toViewElement(data.item);
+        const img = findChildInView(figure, 'img', writer);
 
-    function findChildInView(parentViewElement, childViewName, viewWriter) {
-      for (const child of viewWriter.createRangeIn(parentViewElement).getItems()) {
-        if (child.is('element', childViewName)) {
-          return child;
+        if (img) {
+          writer.setAttribute('data-image-style', data.attributeNewValue || '', img);
         }
+      });
+  }
+
+
+  function findChildInView(parentViewElement, childViewName, viewWriter) {
+    for (const child of viewWriter.createRangeIn(parentViewElement).getItems()) {
+      if (child.is('element', childViewName)) {
+        return child;
       }
-      return null;
     }
+    return null;
+  }
 
 
 
-    // Expose the plugin to the CKEditor5 namespace.
+  // Expose the plugin to the CKEditor5 namespace.
   CKEditor5.backdropImage = {
     'BackdropImage': BackdropImage
   };
@@ -511,20 +513,12 @@
    * @private
    */
   function modelDataImageStyleToDataAttribute(editor) {
-    /**
-     * Callback for the attribute:dataImageStyle event.
-     *
-     * Saves the custom image style value to the data-image-style attribute.
-     */
     function converter(event, data, conversionApi) {
       const { item } = data;
       const { consumable, writer } = conversionApi;
-
-      // The attribute name in your model that holds the value for data-image-style
       const imageStyleValue = item.getAttribute('dataImageStyle');
 
       if (!imageStyleValue || !consumable.consume(item, 'attribute:dataImageStyle')) {
-        console.log("No imageStyleValue found or not consumable");
         return;
       }
 
@@ -541,7 +535,7 @@
   }
 
 
-   /**
+  /**
    * Generates a callback that saves data-align attribute on data downcast.
    *
    * @return {function}
@@ -695,7 +689,6 @@
         // Note: Make sure 'dataImageStyle' is allowed in the schema for image elements
         writer.setAttribute('dataImageStyle', dataImageStyle, image);
         attributesToConsume.push('data-image-style');
-        console.log('data-image-style attribute processed:', dataImageStyle);
       }
 
       if (editor.plugins.has('ImageStyleEditing') && consumable.test(viewItem, { name: true, attributes: 'data-align' })) {
@@ -704,7 +697,6 @@
         if (imageStyle) {
           writer.setAttribute('imageStyle', imageStyle, image);
           attributesToConsume.push('data-align');
-          console.log('data-image-style attribute processed:', imageStyle);
         }
       }
 
@@ -855,9 +847,6 @@
    * CKEditor command that opens the Backdrop image editing dialog.
    */
   class BackdropImageCommand extends CKEditor5.core.Command {
-    /**
-     * @inheritdoc
-     */
     refresh() {
       const editor = this.editor;
       const imageUtils = editor.plugins.get('ImageUtils');
@@ -866,9 +855,6 @@
       this.value = !!element;
     }
 
-    /**
-     * Executes the command.
-     */
     execute() {
       const editor = this.editor;
       const config = editor.config.get('backdropImage');
@@ -879,48 +865,16 @@
 
       // Convert attributes to map for easier looping.
       const extraAttributes = new Map(Object.entries(config.extraAttributes));
-
-      const uploadsEnabled = true; // @todo Set dynamically.
       let existingValues = {};
 
       if (imageElement) {
-        // Debugging: Log the model element and all its attributes
-        //console.log("Current image model element:", imageElement);
-        // Assuming 'dataImageStyle' is the model attribute for data-image-style
         existingValues['data-image-style'] = imageElement.getAttribute('dataImageStyle');
-        // Most attributes can be directly mapped from the model.
         extraAttributes.forEach((attributeName, modelName) => {
           existingValues[attributeName] = imageElement.getAttribute(modelName);
         });
-
-        // Convert the 'resizedWidth' internal attribute to be the 'width'
-        // attribute. Also update 'height' to match.
-        const resizedWidth = imageElement.getAttribute('resizedWidth');
-        if (existingValues['width'] && existingValues['height'] && resizedWidth) {
-          const [newWidth, newHeight] = _getResizedWidthHeight(existingValues['width'], existingValues['height'], resizedWidth);
-          existingValues['width'] = newWidth;
-          existingValues['height'] = newHeight;
-        }
-
-        // Alignment is stored as a CKEditor Image Style.
-        const imageStyle = imageElement.getAttribute('imageStyle');
-        const alignAttribute = _getDataAttributeFromModelImageStyle(imageStyle);
-        existingValues['data-align'] = alignAttribute;
-
-        // The image caption is stored outside the imageElement model and must
-        // be retrieved to get its value.
-        const imageCaption = ImageCaptionUtils.getCaptionFromImageModelElement(imageElement);
-        existingValues['data-has-caption'] = !!imageCaption;
-        if (imageCaption && imageCaption.childCount) {
-          const captionValue = editor.data.processor.toData(imageCaption.getChild(0));
-          existingValues['data-caption'] = captionValue;
-        }
-        console.log("Existing Values:", existingValues);
       }
 
       const saveCallback = (dialogValues) => {
-        console.log("Dialog Values:", dialogValues);
-        // Map the submitted form values to the CKEditor image model.
         let imageAttributes = {};
 
         extraAttributes.forEach((attributeName, modelName) => {
@@ -928,75 +882,38 @@
             imageAttributes[modelName] = dialogValues.attributes[attributeName];
           }
         });
-        // Handle data-align independently
-        if (dialogValues.attributes['data-align'] !== undefined) {
-          const imageStyle = _getModelImageStyleFromDataAttribute(dialogValues.attributes['data-align']);
-          imageAttributes['imageStyle'] = imageStyle;
-        }
 
-        // Directly applying or preserving data-image-style
         if (dialogValues.attributes['data-image-style'] !== undefined) {
           imageAttributes['dataImageStyle'] = dialogValues.attributes['data-image-style'];
-        } else if (existingValues['data-image-style'] !== undefined) {
-          // Preserve existing data-image-style if not being explicitly changed
-          imageAttributes['dataImageStyle'] = existingValues['data-image-style'];
         }
 
-        // For updating an existing element:
         if (imageElement) {
-          console.log("Before setting attributes, imageElement attributes:", [...imageElement.getAttributeKeys()].map(key => `${key}: ${imageElement.getAttribute(key)}`));
           model.change((writer) => {
-            writer.removeAttribute('resizedWidth', imageElement);
             writer.setAttributes(imageAttributes, imageElement);
           });
-          console.log("After setting attributes, imageElement attributes:", [...imageElement.getAttributeKeys()].map(key => `${key}: ${imageElement.getAttribute(key)}`));
-
-
-          // If width/height are empty, set to their natural values.
-          if (imageAttributes['width'] === '' && imageAttributes['height'] === '') {
-            imageUtils.setImageNaturalSizeAttributes(imageElement);
-          }
-
-          const imageCaption = ImageCaptionUtils.getCaptionFromImageModelElement(imageElement);
-          // Remove an existing caption if disabled.
-          if (imageCaption && !dialogValues.attributes['data-has-caption']) {
-            editor.execute('toggleImageCaption');
-          }
-          // Add a caption if enabled and none yet exists.
-          if (!imageCaption && dialogValues.attributes['data-has-caption']) {
-            editor.execute('toggleImageCaption', { focusCaptionOnShow: true });
-          }
+        } else {
+          const imageElement = editor.model.document.selection.getFirstPosition().parent;
+          editor.execute('insertImage', {
+            source: {
+              src: dialogValues.attributes.src,
+              'data-image-style': dialogValues.attributes['data-image-style']
+            }
+          });
         }
-        // Inserting a new element:
-        else {
-          // An imageStyle key (even if undefined) on image insert will cause
-          // conflicts in the Image Style plugin, so remove the attribute entirely
-          // from the object.
-          if (imageAttributes.hasOwnProperty('imageStyle') && !imageAttributes['imageStyle']) {
-            delete imageAttributes['imageStyle'];
-          }
-          // Inserting an image has an unusual way of passing the attributes.
-          // See https://ckeditor.com/docs/ckeditor5/latest/api/module_image_image_insertimagecommand-InsertImageCommand.html
-          editor.execute('insertImage', { source: [imageAttributes] });
-
-          // Toggle showing the caption after the image is inserted.
-          if (dialogValues.attributes['data-has-caption']) {
-            editor.execute('toggleImageCaption', { focusCaptionOnShow: true });
-          }
-        }
-        console.log("Image Attributes:", imageAttributes);
       };
 
       const dialogSettings = {
         title: config.insertLabel || 'Insert Image',
-        uploads: uploadsEnabled,
+        uploads: true,
         dialogClass: 'editor-image-dialog'
       };
+
       Backdrop.ckeditor5.openDialog(editor, config.dialogUrl, existingValues, saveCallback, dialogSettings);
     }
   }
 
-  /**
+
+    /**
    * CKEditor upload adapter that sends a request to Backdrop on file upload.
    *
    * Adapted from @ckeditor5/ckeditor5-upload/src/adapters/simpleuploadadapter
