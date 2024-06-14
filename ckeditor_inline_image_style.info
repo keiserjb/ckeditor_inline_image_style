@@ -2,4 +2,3 @@ name = CKEditor inline image styles
 description = CKEditor inline image styles
 backdrop = 1.x
 type = module
-configure = admin/config/media/ckeditor_inline_image_style
