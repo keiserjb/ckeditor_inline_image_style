@@ -237,17 +237,13 @@ function ckeditor_inline_image_style_node_update($node) {
  * @param bool $is_update
  *   Whether this is an update operation.
  */
-function ckeditor_inline_image_style_handle_file_usage($node, $is_update) {
+function ckeditor_inline_image_style_handle_file_usage($node, $is_update = FALSE) {
   // Get the current referenced files.
-  $current_referenced_files = [];
-  if (isset($node->body[LANGUAGE_NONE][0]['value'])) {
-    $text = $node->body[LANGUAGE_NONE][0]['value'];
-    $current_referenced_files = ckeditor_inline_image_style_find_referenced_files($text);
-  }
+  $current_referenced_files = ckeditor_inline_image_style_find_referenced_files_in_entity($node);
 
   // If this is an update, compare to the original files.
-  if ($is_update) {
-    $original_referenced_files = ckeditor_inline_image_style_find_referenced_files($node->original->body[LANGUAGE_NONE][0]['value']);
+  if ($is_update && isset($node->original)) {
+    $original_referenced_files = ckeditor_inline_image_style_find_referenced_files_in_entity($node->original);
     $removed_files = array_diff($original_referenced_files, $current_referenced_files);
     ckeditor_inline_image_style_delete_file_usage($removed_files, $node);
   }
@@ -268,6 +264,76 @@ function ckeditor_inline_image_style_handle_file_usage($node, $is_update) {
 }
 
 /**
+ * Find referenced files in the entity, including paragraphs.
+ *
+ * @param object $entity
+ *   The entity object (node or paragraph).
+ *
+ * @return array
+ *   An array of file IDs.
+ */
+function ckeditor_inline_image_style_find_referenced_files_in_entity($entity) {
+  $file_ids = [];
+
+  // Iterate through all fields in the entity.
+  foreach (field_info_instances('node', $entity->type) as $field_name => $field_info) {
+    if (!empty($entity->{$field_name})) {
+      $field = $entity->{$field_name};
+      $field_type = field_info_field($field_info['field_name']);
+
+      // Check if the field is one of the text types or paragraphs.
+      if (in_array($field_type['type'], ['text', 'text_long', 'text_with_summary', 'paragraphs'])) {
+        foreach ($field[LANGUAGE_NONE] as $field_item) {
+          // If it's a text field, find referenced files.
+          if (in_array($field_type['type'], ['text', 'text_long', 'text_with_summary'])) {
+            $file_ids = array_merge($file_ids, ckeditor_inline_image_style_find_referenced_files($field_item['value']));
+          }
+          // If it's a paragraphs field, recursively find referenced files.
+          elseif ($field_type['type'] === 'paragraphs') {
+            $paragraph_entities = entity_load('paragraphs_item', [$field_item['value']]);
+            foreach ($paragraph_entities as $paragraph) {
+              $file_ids = array_merge($file_ids, ckeditor_inline_image_style_find_referenced_files_in_paragraph($paragraph));
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return $file_ids;
+}
+
+/**
+ * Find referenced files in a paragraph entity.
+ *
+ * @param object $paragraph
+ *   The paragraph entity.
+ *
+ * @return array
+ *   An array of file IDs.
+ */
+function ckeditor_inline_image_style_find_referenced_files_in_paragraph($paragraph) {
+  $file_ids = [];
+
+  // Iterate through all fields in the paragraph.
+  foreach (field_info_instances('paragraphs_item', $paragraph->bundle()) as $field_name => $field_info) {
+    if (!empty($paragraph->{$field_name})) {
+      $field = $paragraph->{$field_name};
+      $field_type = field_info_field($field_info['field_name']);
+
+      // Check if the field is a text type.
+      if (in_array($field_type['type'], ['text', 'text_long', 'text_with_summary'])) {
+        foreach ($field[LANGUAGE_NONE] as $field_item) {
+          $file_ids = array_merge($file_ids, ckeditor_inline_image_style_find_referenced_files($field_item['value']));
+        }
+      }
+    }
+  }
+
+  return $file_ids;
+}
+
+/**
  * Find referenced files in the processed text.
  *
  * @param string $text
@@ -278,7 +344,6 @@ function ckeditor_inline_image_style_handle_file_usage($node, $is_update) {
  */
 function ckeditor_inline_image_style_find_referenced_files($text) {
   $file_ids = [];
-
   // Match all img tags and extract the src attribute.
   preg_match_all('/<img [^>]*src=["\']([^"\']+)["\'][^>]*>/i', $text, $matches);
 
@@ -316,7 +381,6 @@ function ckeditor_inline_image_style_file_usage_exists($file, $entity) {
     ->execute();
   return (bool) $query->fetchField();
 }
-
 
 /**
  * Deletes file usage of files no longer referenced by the node.
