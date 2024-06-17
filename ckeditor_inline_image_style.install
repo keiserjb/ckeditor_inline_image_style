@@ -1,0 +1,21 @@
+<?php
+
+/**
+ * Implements hook_uninstall().
+ */
+function ckeditor_inline_image_style_uninstall() {
+  // Load all text formats.
+  $formats = filter_formats();
+
+  // Iterate through each text format and remove the filter settings for ckeditor_inline_image_style.
+  foreach ($formats as $format) {
+    if (isset($format->filters['ckeditor_inline_image_style'])) {
+      unset($format->filters['ckeditor_inline_image_style']);
+      filter_format_save($format);
+    }
+  }
+
+  // Remove any other settings or configurations your module might have created.
+  // For example, you could delete any variable_get() settings like this:
+  // variable_del('ckeditor_inline_image_style_some_setting');
+}

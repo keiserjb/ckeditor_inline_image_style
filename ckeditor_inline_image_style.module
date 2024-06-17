@@ -36,7 +36,6 @@ function ckeditor_inline_image_style_filter_settings($form, &$form_state, $filte
     '#options' => $options,
     '#description' => t('Choose the image styles that will be available for selection in CKEditor.'),
   ];
-
   return $settings;
 }
 
@@ -72,7 +71,6 @@ function ckeditor_inline_image_style_filter_process($text) {
   }
   return $text;
 }
-
 
 /**
  * Prepares an image.
@@ -344,6 +342,7 @@ function ckeditor_inline_image_style_find_referenced_files_in_paragraph($paragra
  */
 function ckeditor_inline_image_style_find_referenced_files($text) {
   $file_ids = [];
+
   // Match all img tags and extract the src attribute.
   preg_match_all('/<img [^>]*src=["\']([^"\']+)["\'][^>]*>/i', $text, $matches);
 
@@ -547,7 +546,6 @@ function ckeditor_inline_image_style_preprocess_page(&$variables) {
   backdrop_add_library('ckeditor_inline_image_style', 'ckeditor_inline_image_style');
 }
 
-
 /**
  * Implements hook_library_info().
  */
@@ -565,8 +563,6 @@ function ckeditor_inline_image_style_library_info() {
     ),
   );
 }
-
-
 
 /**
  * Implements hook_library_info_alter().
@@ -665,4 +661,3 @@ function ckeditor_inline_image_style_css($prefix = '') {
   }
   return implode("\n", $mappings);
 }
-
