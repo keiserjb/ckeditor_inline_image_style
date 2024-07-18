@@ -59,7 +59,7 @@ function ckeditor_inline_image_style_filter_process($text) {
       $new_image = preg_replace('/width="[^"]*"/i', 'width="' . $styled_width . '"', $new_image);
       $new_image = preg_replace('/height="[^"]*"/i', 'height="' . $styled_height . '"', $new_image);
 
-      // Ensure data-image-style attribute is present
+      // Ensure data-image-style attribute is present.
       if (!preg_match('/data-image-style\s*=\s*["\'][^"\']*["\']/', $new_image)) {
         $new_image = preg_replace('/<img /i', '<img data-image-style="' . check_plain($image_style) . '" ', $new_image);
       } else {
@@ -76,94 +76,56 @@ function ckeditor_inline_image_style_filter_process($text) {
  * Prepares an image.
  */
 function ckeditor_inline_image_style_filter_prepare_image($image) {
-  $image = str_replace('/>', '>', $image);
-  $image = str_replace('>', ' />', $image);
-  $image = str_replace("&nbsp;", '', $image);
-  $image = htmlspecialchars($image);
+  // Clean up the image tag.
+  $image = htmlspecialchars(str_replace(['/>', '>', "&nbsp;"], ['>', ' />', ''], $image));
   $xml = simplexml_load_string('<image>' . html_entity_decode($image, ENT_QUOTES, "utf-8") . '</image>');
-
-  if (isset($xml->img[0]) && is_object($xml->img[0])) {
-    $attributes = [];
-    foreach ($xml->img[0]->attributes() as $a => $b) {
-      $attributes[$a] = (string) $b;
-    }
-  }
-
-  $image_style = FALSE;
-  if (isset($attributes['data-image-style'])) {
-    $image_style = $attributes['data-image-style'];
-  }
-  if (!$image_style) {
+  if (!isset($xml->img[0]) || !is_object($xml->img[0])) {
     return FALSE;
   }
 
-  $image_styles = image_styles();
-  if (!isset($image_styles[$image_style])) {
-    return FALSE;
+  $attributes = [];
+  foreach ($xml->img[0]->attributes() as $a => $b) {
+    $attributes[$a] = (string) $b;
   }
-  if (!isset($attributes['src'])) {
+
+  $image_style = $attributes['data-image-style'] ?? FALSE;
+  if (!$image_style || !isset($attributes['src']) || !isset(image_styles()[$image_style])) {
     return FALSE;
   }
 
   $src = $attributes['src'];
   unset($attributes['src']);
-  $alt = isset($attributes['alt']) ? $attributes['alt'] : '';
+  $alt = $attributes['alt'] ?? '';
   unset($attributes['alt']);
-  $title = isset($attributes['title']) ? $attributes['title'] : '';
+  $title = $attributes['title'] ?? '';
   unset($attributes['title']);
-  if (!empty($attributes['class']) && !is_array($attributes['class'])) {
-    $attributes['class'] = array_filter(explode(' ', $attributes['class']));
-  }
+  $attributes['class'] = !empty($attributes['class']) && !is_array($attributes['class']) ? array_filter(explode(' ', $attributes['class'])) : [];
 
   $uri = ckeditor_inline_image_style_image_uri($src);
-  if (!$uri) {
-    return FALSE;
-  }
-  $file = _ckeditor_inline_image_style_file_load_by_uri($uri);
-  if (!$file) {
-    return FALSE;
-  }
-  $image_info = image_get_info($uri);
-  if (!$image_info) {
+  if (!$uri || !$file = _ckeditor_inline_image_style_file_load_by_uri($uri) || !$image_info = image_get_info($uri)) {
     return FALSE;
   }
 
-  if ($image_style != 'none') {
-    $styled_image_url = image_style_url($image_style, $uri);
-  } else {
-    $styled_image_url = file_create_url($uri);
+  $styled_image_url = $image_style != 'none' ? image_style_url($image_style, $uri) : file_create_url($uri);
+  $styled_width = $image_info['width'];
+  $styled_height = $image_info['height'];
+
+  if ($image_style != 'none' && !empty(image_styles()[$image_style]['effects'])) {
+    $effect = reset(image_styles()[$image_style]['effects']);
+    $styled_width = $effect['data']['width'] ?? $styled_width;
+    $styled_height = $effect['data']['height'] ?? $styled_height;
   }
 
-  if ($image_style != 'none' && !empty($image_styles[$image_style]['effects'])) {
-    $effect = reset($image_styles[$image_style]['effects']);
-    if (isset($effect['data']['width']) && isset($effect['data']['height'])) {
-      $styled_width = $effect['data']['width'];
-      $styled_height = $effect['data']['height'];
-    }
-  } else {
-    $styled_image_url = file_create_url($uri);
-    $styled_width = $image_info['width'];
-    $styled_height = $image_info['height'];
-  }
-
-  if (!isset($styled_width) || !isset($styled_height)) {
-    return FALSE;
-  }
-
-  if (!isset($styled_image_url)) {
-    $styled_image_url = image_style_url($image_style, $uri);
-  }
-  $image_render_array = [
-    '#theme'      => 'image_style',
+  return [
+    '#theme' => 'image_style',
     '#style_name' => $image_style,
-    '#path'       => $styled_image_url,
-    '#width'      => $styled_width,
-    '#height'     => $styled_height,
-    '#alt'        => $alt,
-    '#title'      => $title,
+    '#path' => $styled_image_url,
+    '#width' => $styled_width,
+    '#height' => $styled_height,
+    '#alt' => $alt,
+    '#title' => $title,
     '#attributes' => ['data-image-style' => $image_style] + $attributes,
   ];
-  return $image_render_array;
 }
 
 /**
@@ -236,17 +198,12 @@ function ckeditor_inline_image_style_node_update($node) {
  *   Whether this is an update operation.
  */
 function ckeditor_inline_image_style_handle_file_usage($node, $is_update = FALSE) {
-  // Get the current referenced files.
   $current_referenced_files = ckeditor_inline_image_style_find_referenced_files_in_entity($node);
-
-  // If this is an update, compare to the original files.
   if ($is_update && isset($node->original)) {
     $original_referenced_files = ckeditor_inline_image_style_find_referenced_files_in_entity($node->original);
-    $removed_files = array_diff($original_referenced_files, $current_referenced_files);
-    ckeditor_inline_image_style_delete_file_usage($removed_files, $node);
+    ckeditor_inline_image_style_delete_file_usage(array_diff($original_referenced_files, $current_referenced_files), $node);
   }
 
-  // Always add current files as permanent and track their usage.
   foreach ($current_referenced_files as $file_id) {
     $file = file_load($file_id);
     if ($file) {
@@ -273,25 +230,18 @@ function ckeditor_inline_image_style_handle_file_usage($node, $is_update = FALSE
 function ckeditor_inline_image_style_find_referenced_files_in_entity($entity) {
   $file_ids = [];
 
-  // Iterate through all fields in the entity.
   foreach (field_info_instances('node', $entity->type) as $field_name => $field_info) {
     if (!empty($entity->{$field_name})) {
       $field = $entity->{$field_name};
       $field_type = field_info_field($field_info['field_name']);
+      $field_type_name = $field_type['type'];
 
-      // Check if the field is one of the text types or paragraphs.
-      if (in_array($field_type['type'], ['text', 'text_long', 'text_with_summary', 'paragraphs'])) {
-        foreach ($field[LANGUAGE_NONE] as $field_item) {
-          // If it's a text field, find referenced files.
-          if (in_array($field_type['type'], ['text', 'text_long', 'text_with_summary'])) {
-            $file_ids = array_merge($file_ids, ckeditor_inline_image_style_find_referenced_files($field_item['value']));
-          }
-          // If it's a paragraphs field, recursively find referenced files.
-          elseif ($field_type['type'] === 'paragraphs') {
-            $paragraph_entities = entity_load('paragraphs_item', [$field_item['value']]);
-            foreach ($paragraph_entities as $paragraph) {
-              $file_ids = array_merge($file_ids, ckeditor_inline_image_style_find_referenced_files_in_paragraph($paragraph));
-            }
+      foreach ($field[LANGUAGE_NONE] as $field_item) {
+        if (in_array($field_type_name, ['text', 'text_long', 'text_with_summary'])) {
+          $file_ids = array_merge($file_ids, ckeditor_inline_image_style_find_referenced_files($field_item['value']));
+        } elseif ($field_type_name === 'paragraphs') {
+          foreach (entity_load('paragraphs_item', [$field_item['value']]) as $paragraph) {
+            $file_ids = array_merge($file_ids, ckeditor_inline_image_style_find_referenced_files_in_paragraph($paragraph));
           }
         }
       }
@@ -313,13 +263,11 @@ function ckeditor_inline_image_style_find_referenced_files_in_entity($entity) {
 function ckeditor_inline_image_style_find_referenced_files_in_paragraph($paragraph) {
   $file_ids = [];
 
-  // Iterate through all fields in the paragraph.
   foreach (field_info_instances('paragraphs_item', $paragraph->bundle()) as $field_name => $field_info) {
     if (!empty($paragraph->{$field_name})) {
       $field = $paragraph->{$field_name};
       $field_type = field_info_field($field_info['field_name']);
 
-      // Check if the field is a text type.
       if (in_array($field_type['type'], ['text', 'text_long', 'text_with_summary'])) {
         foreach ($field[LANGUAGE_NONE] as $field_item) {
           $file_ids = array_merge($file_ids, ckeditor_inline_image_style_find_referenced_files($field_item['value']));
@@ -363,20 +311,19 @@ function ckeditor_inline_image_style_find_referenced_files($text) {
 /**
  * Check if a file usage record already exists.
  *
- * @param object $file
- *   The file object.
- * @param object $entity
- *   The node entity.
+ * @param int $fid
+ *   The file ID.
  *
  * @return bool
  *   TRUE if the file usage record exists, FALSE otherwise.
  */
-function ckeditor_inline_image_style_file_usage_exists($file, $entity) {
+function ckeditor_inline_image_style_file_usage_exists($fid) {
   $query = db_select('file_usage', 'fu')
     ->fields('fu', ['fid'])
-    ->condition('fid', $file->fid)
-    ->condition('type', 'node')
-    ->condition('id', $entity->nid)
+    ->condition('fid', $fid)
+    ->condition('module', 'file')
+    ->condition('type', 'file')
+    ->condition('id', $fid)
     ->execute();
   return (bool) $query->fetchField();
 }
@@ -401,30 +348,50 @@ function ckeditor_inline_image_style_delete_file_usage(array $fids, $entity) {
  * Implements hook_form_BASE_FORM_ID_alter() for node edit forms.
  */
 function ckeditor_inline_image_style_form_node_form_alter(&$form, &$form_state, $form_id) {
-  if (strpos($form_id, 'node_form') !== FALSE) {
-    backdrop_add_css(ckeditor_inline_image_style_css('.ImagePreviewBox'), 'inline');
+  ckeditor_inline_image_style_form_alter_common($form, $form_state, $form_id);
+}
 
-    $image_styles = image_styles();
-    $mappings = [];
+/**
+ * Implements hook_form_BASE_FORM_ID_alter() for block add forms on a layout
+ * screen.
+ */
+function ckeditor_inline_image_style_form_block_add_block_form_alter(&$form, &$form_state, $form_id) {
+  ckeditor_inline_image_style_form_alter_common($form, $form_state, $form_id);
+}
 
-    foreach ($image_styles as $machine_name => $info) {
-      $mappings[$machine_name] = $info['label'];
-    }
+/**
+ * Implements hook_form_BASE_FORM_ID_alter() for block configuration forms.
+ */
+function ckeditor_inline_image_style_form_block_admin_configure_alter(&$form, &$form_state, $form_id) {
+  ckeditor_inline_image_style_form_alter_common($form, $form_state, $form_id);
+}
 
-    $mappings = ['none' => 'Original Image'] + $mappings;
-    $generic_label = t('All Image Styles');
+/**
+ * Implements hook_form_BASE_FORM_ID_alter() for block configuration forms.
+ */
+function ckeditor_inline_image_style_form_layout_block_configure_form_alter(&$form, &$form_state, $form_id) {
+  ckeditor_inline_image_style_form_alter_common($form, $form_state, $form_id);
+}
 
-    backdrop_add_js([
-      'ckeditor_inline_image_style' => [
-        'mappings'  => $mappings,
-        'label'     => $generic_label,
-        'editorCSS' => ckeditor_inline_image_style_css(),
-      ],
-    ], 'setting');
+/**
+ * Common form alter logic for both node and block add forms.
+ */
+function ckeditor_inline_image_style_form_alter_common(&$form, &$form_state, $form_id) {
+  backdrop_add_css(ckeditor_inline_image_style_css('.ImagePreviewBox'), 'inline');
 
-    $path_to_css = backdrop_get_path('module', 'ckeditor_inline_image_style') . '/css/ckeditor5.css';
-    backdrop_add_css($path_to_css);
+  $image_styles = image_styles();
+  $mappings = ['none' => 'Original Image'];
+  foreach ($image_styles as $machine_name => $info) {
+    $mappings[$machine_name] = $info['label'];
   }
+
+  backdrop_add_js(['ckeditor_inline_image_style' => [
+    'mappings'  => $mappings,
+    'label'     => t('All Image Styles'),
+    'editorCSS' => ckeditor_inline_image_style_css(),
+  ]], 'setting');
+
+  backdrop_add_css(backdrop_get_path('module', 'ckeditor_inline_image_style') . '/css/ckeditor5.css');
 }
 
 /**
@@ -547,24 +514,6 @@ function ckeditor_inline_image_style_preprocess_page(&$variables) {
 }
 
 /**
- * Implements hook_library_info().
- */
-function ckeditor_inline_image_style_library_info() {
-  $module_path = backdrop_get_path('module', 'ckeditor_inline_image_style');
-  return array(
-    'ckeditor_inline_image_style' => array(
-      'version' => '1.0',
-      'js' => array(
-        $module_path . '/js/ckeditor_inline_image_style.js' => array(),
-      ),
-      'dependencies' => array(
-        array('system', 'jquery'),
-      ),
-    ),
-  );
-}
-
-/**
  * Implements hook_library_info_alter().
  */
 function ckeditor_inline_image_style_library_info_alter(&$libraries, $module) {
@@ -584,7 +533,7 @@ function ckeditor_inline_image_style_ckeditor5_plugins_alter(array &$plugins) {
     'library' => ['ckeditor5', 'backdrop.ckeditor5.backdrop-image'],
     'buttons' => [
       'backdropImage' => [
-        'label'               => t('Image'),
+        'label' => t('Image'),
         'plugin_dependencies' => [
           'image.Image',
           'image.ImageToolbar',
@@ -593,10 +542,10 @@ function ckeditor_inline_image_style_ckeditor5_plugins_alter(array &$plugins) {
           'image.ImageResize',
           'image.ImageCaptionUtils',
         ],
-        'required_html'       => [
+        'required_html' => [
           '<img src alt height width data-file-id data-image-style>',
         ],
-        'image'               => $image_prefix . '/image.svg',
+        'image' => $image_prefix . '/image.svg',
       ],
     ],
     'config'  => [
@@ -660,4 +609,47 @@ function ckeditor_inline_image_style_css($prefix = '') {
     }
   }
   return implode("\n", $mappings);
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function ckeditor_inline_image_style_form_alter(&$form, &$form_state, $form_id) {
+  // Target layout block add or configure forms.
+  if (strpos($form_id, 'block_add_block_form') !== FALSE || strpos($form_id, 'block_admin_configure') !== FALSE || strpos($form_id, 'layout_block_configure_form') !== FALSE) {
+    // Attach custom submit handler.
+    $form['#submit'][] = 'ckeditor_inline_image_style_block_form_submit';
+    watchdog('ckeditor_inline_image_style', 'Custom submit handler attached to form_id: @form_id', ['@form_id' => $form_id], WATCHDOG_DEBUG);
+  }
+}
+
+/**
+ * Custom submit handler for block forms.
+ */
+function ckeditor_inline_image_style_block_form_submit($form, &$form_state) {
+  $edit = $form_state['values'];
+  // Check if the block content is available in the 'body' field.
+  $block_content = $edit['body']['value'] ?? $edit['content']['value'] ?? NULL;
+
+  if ($block_content) {
+    // Extract file IDs from the block content.
+    $file_ids = ckeditor_inline_image_style_find_referenced_files($block_content);
+
+    if (!empty($file_ids)) {
+      // Load files and update their status to permanent, and add usage.
+      $files = file_load_multiple($file_ids);
+      foreach ($files as $file) {
+        if ($file) {
+          if ($file->status != FILE_STATUS_PERMANENT) {
+            $file->status = FILE_STATUS_PERMANENT;
+            file_save($file);
+          }
+          // Ensure the file usage is added only once.
+          if (!ckeditor_inline_image_style_file_usage_exists($file->fid)) {
+            file_usage_add($file, 'file', 'file', $file->fid);
+          }
+        }
+      }
+    }
+  }
 }
