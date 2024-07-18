@@ -1,4 +1,4 @@
-name = CKEditor inline image styles
-description = CKEditor inline image styles
+name = CKEditor Inline Image Style
+description = Use image styles inside the text editor.
 backdrop = 1.x
 type = module
