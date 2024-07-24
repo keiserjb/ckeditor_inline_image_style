@@ -106,6 +106,13 @@ function ckeditor_inline_image_style_filter_prepare_image($image) {
     return FALSE;
   }
 
+   // Check if image info is available.
+
+  $image_info = image_get_info($uri);
+  if (!$image_info) {
+    return FALSE;
+  }
+
   $styled_image_url = $image_style != 'none' ? image_style_url($image_style, $uri) : file_create_url($uri);
   $styled_width = $image_info['width'];
   $styled_height = $image_info['height'];
@@ -211,7 +218,7 @@ function ckeditor_inline_image_style_handle_file_usage($node, $is_update = FALSE
         $file->status = FILE_STATUS_PERMANENT;
         file_save($file);
       }
-      if (!ckeditor_inline_image_style_file_usage_exists($file, $node)) {
+      if (!ckeditor_inline_image_style_file_usage_exists($file->fid, $node->nid)) {
         file_usage_add($file, 'ckeditor_inline_image_style', 'node', $node->nid);
       }
     }
