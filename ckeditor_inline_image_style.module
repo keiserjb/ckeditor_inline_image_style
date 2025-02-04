@@ -106,7 +106,7 @@ function ckeditor_inline_image_style_filter_prepare_image($image) {
     return FALSE;
   }
 
-   // Check if image info is available.
+  // Check if image info is available.
 
   $image_info = image_get_info($uri);
   if (!$image_info) {
@@ -460,7 +460,6 @@ function ckeditor_inline_image_style_format_editor_dialog_save($form, &$form_sta
     $_SESSION['inline_image_styles_last_attributes']['data-image-style'] = $style_name;
   }
 
-  // Ensure data-image-style is set if it's in the form state.
   if (isset($form_state['values']['attributes']) && !isset($form_state['values']['attributes']['data-image-style'])) {
     $form_state['values']['attributes']['data-image-style'] = isset($_SESSION['inline_image_styles_last_attributes']['data-image-style']) ? $_SESSION['inline_image_styles_last_attributes']['data-image-style'] : 'none';
   }
@@ -626,7 +625,6 @@ function ckeditor_inline_image_style_form_alter(&$form, &$form_state, $form_id) 
   if (strpos($form_id, 'block_add_block_form') !== FALSE || strpos($form_id, 'block_admin_configure') !== FALSE || strpos($form_id, 'layout_block_configure_form') !== FALSE) {
     // Attach custom submit handler.
     $form['#submit'][] = 'ckeditor_inline_image_style_block_form_submit';
-    watchdog('ckeditor_inline_image_style', 'Custom submit handler attached to form_id: @form_id', ['@form_id' => $form_id], WATCHDOG_DEBUG);
   }
 }
 
