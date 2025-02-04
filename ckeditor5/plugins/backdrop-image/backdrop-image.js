@@ -877,51 +877,79 @@ class BackdropImageCommand extends CKEditor5.core.Command {
     const saveCallback = (dialogValues) => {
       let imageAttributes = {};
 
-      extraAttributes.forEach((attributeName, modelName) => {
-        if (dialogValues.attributes[attributeName] !== undefined) {
-          imageAttributes[modelName] = dialogValues.attributes[attributeName];
+      // Map dialog keys to model keys.
+      for (const key in dialogValues.attributes) {
+        if (dialogValues.attributes.hasOwnProperty(key)) {
+          switch (key) {
+            case 'data-image-style':
+              imageAttributes['dataImageStyle'] = dialogValues.attributes[key];
+              break;
+            case 'data-file-id':
+              imageAttributes['dataFileId'] = dialogValues.attributes[key];
+              break;
+            case 'data-align':
+              // Convert "center", "left", "right" to model imageStyle values.
+              const dataAlign = dialogValues.attributes[key];
+              let modelAlign;
+              if (dataAlign === 'center') {
+                modelAlign = 'alignCenter';
+              } else if (dataAlign === 'right') {
+                modelAlign = 'alignRight';
+              } else if (dataAlign === 'left') {
+                modelAlign = 'alignLeft';
+              }
+              imageAttributes['imageStyle'] = modelAlign;
+              break;
+            default:
+              // Pass through other attributes (src, alt, width, height, etc.)
+              imageAttributes[key] = dialogValues.attributes[key];
+          }
         }
-      });
-
-      if (dialogValues.attributes['data-image-style'] !== undefined) {
-        imageAttributes['dataImageStyle'] = dialogValues.attributes['data-image-style'];
       }
 
+      // If editing an existing image...
       if (imageElement) {
         model.change((writer) => {
           writer.setAttributes(imageAttributes, imageElement);
+          // Handle caption: if captioning is enabled...
+          if (dialogValues.attributes['data-has-caption'] == 1) {
+            // Check if a caption already exists.
+            let captionElement = null;
+            for (const child of imageElement.getChildren()) {
+              if (child.name === 'caption') {
+                captionElement = child;
+                break;
+              }
+            }
+            // If not, create one.
+            if (!captionElement) {
+              captionElement = writer.createElement('caption');
+              writer.append(captionElement, imageElement);
+            }
+            // Update the caption text.
+            // Here we clear any existing text and insert the new caption.
+            writer.remove(writer.createRangeIn(captionElement));
+            writer.insertText(
+              dialogValues.attributes['data-caption'] || '',
+              captionElement
+            );
+          }
         });
       } else {
-        //console.log("Inserting new image with attributes:",
-        // dialogValues.attributes);
-        // Map dialog attributes to model attribute names.
-        let imageAttributes = {};
-        for (const key in dialogValues.attributes) {
-          if (dialogValues.attributes.hasOwnProperty(key)) {
-            // Convert hyphenated keys to camelCase where needed.
-            switch (key) {
-              case 'data-image-style':
-                imageAttributes['dataImageStyle'] = dialogValues.attributes[key];
-                break;
-              case 'data-file-id':
-                imageAttributes['dataFileId'] = dialogValues.attributes[key];
-                break;
-              case 'data-align':
-                // Depending on your converters, you might need to map this too.
-                imageAttributes['dataAlign'] = dialogValues.attributes[key];
-                break;
-              default:
-                // Other attributes (like src, alt, width, height) can be passed as is.
-                imageAttributes[key] = dialogValues.attributes[key];
-            }
-          }
-        }
+        // Inserting a new image.
+        console.log("Inserting new image with attributes:", dialogValues.attributes);
         editor.model.change((writer) => {
-          const imageElement = writer.createElement('imageBlock', imageAttributes);
+          let imageElement = writer.createElement('imageBlock', imageAttributes);
+          // If captioning is enabled, create a caption element as a child.
+          if (dialogValues.attributes['data-has-caption'] == 1) {
+            const captionText = dialogValues.attributes['data-caption'] || '';
+            const captionElement = writer.createElement('caption');
+            writer.insertText(captionText, captionElement);
+            writer.append(captionElement, imageElement);
+          }
           writer.insert(imageElement, editor.model.document.selection.getFirstPosition());
         });
       }
-
     };
 
     const dialogSettings = {
