@@ -1,4 +1,6 @@
-# Ckeditor Inline Image Style
+# Ckeditor Inline Image Style (Deprecated)
+
+Note: Inline image style functionality was added to Backdrop core in version 1.31.  Use of this module is no longer necessary and no further changes will be made here. If you would like to report a bug or feature request against Pathauto module, file an issue in the main Backdrop CMS core repository at [https://github.com/backdrop/backdrop-issues](https://github.com/backdrop/backdrop-issues).
 
 Allows users to select an image style while adding inline images using CKEditor.
 
